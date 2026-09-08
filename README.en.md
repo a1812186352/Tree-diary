@@ -1,11 +1,12 @@
-# Doodle Tree Diary
+# Doodle Tree Diary（绘木小札）
 
 [中文](README.md) | [English](README.en.md)
 
 ## About the project
 
-**Doodle Tree Diary** is a tree-growing game presented as an illustrated storybook with branch stickers. The story begins with a sprouting seed. Turn the pages, collect sunlight and water, and attach branches with one, two, or three buds to gradually shape your tree.
+A magical storybook. A tree nurtured by sunlight and rain…
 
+**Doodle Tree Diary（绘木小札）** invites you to spend time with nature. Gather sunlight and water, choose how the branches grow, and guide a small sapling into the tree you imagine. Protect its trunk and welcome animal friends who will help defend it against pests at night. Using mostly mouse movement, clicks, and dragging, place branch stickers to tell your tree’s own story of growth.
 Each page brings a new day. Spend limited resources on growth during the day, welcome animal companions at dusk, and let them help defend the tree against pests at night. Newly placed branches mature after the page turns, so today's choices determine where you can grow tomorrow. The current demo lasts six days: keep at least one heart through the final night to win.
 
 - **A storybook presentation:** a book cover, opening video, illustrated story pages, and page-turn transitions.
@@ -17,6 +18,11 @@ Each page brings a new day. Spend limited resources on growth during the day, we
 
 This guide describes the current Godot demo. The game interface currently uses Chinese; this English guide includes translations of the main buttons.
 
+## Credits
+
+Jammers listed on the Global Game Jam project page: **Yujiacheng91** and **归梦**.
+
+The project introduction is adapted from that page. The gameplay guide describes the current version in this repository.
 ## Download and launch
 
 ### Windows players
