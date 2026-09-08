@@ -1,0 +1,48 @@
+# Godot caches; keep source .import and .uid files.
+.godot/
+.import/
+/android/
+export_credentials.cfg
+
+# Exported builds and archives.
+/build/
+/builds/
+/dist/
+/release/
+/exports/
+*.exe
+*.pck
+*.x86_64
+*.app/
+*.dmg
+*.apk
+*.aab
+*.zip
+*.7z
+
+# Local development tools, previews and editor state.
+/.workbuddy/
+/.codex/
+/.agents/
+/.vscode/
+/.idea/
+/addons/godot_ai/
+/godot-ai-LICENSE.txt
+/work/
+*.lnk
+*.log
+*.tmp
+*.bak
+*~
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Secrets and signing material.
+.env
+.env.*
+!.env.example
+*.pfx
+*.p12
+*.key
+*.keystore

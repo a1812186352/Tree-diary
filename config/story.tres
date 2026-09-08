@@ -1,0 +1,15 @@
+[gd_resource type="Resource" load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scripts/opening/story_config.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/story/page_01.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/story/page_02.png" id="3"]
+[ext_resource type="Texture2D" path="res://assets/story/page_03.png" id="4"]
+[ext_resource type="PackedScene" path="res://scenes/main.tscn" id="5"]
+
+[resource]
+script = ExtResource("1")
+pages = Array[Texture2D]([ExtResource("2"), ExtResource("3"), ExtResource("4")])
+page_titles = PackedStringArray("", "", "")
+page_narrations = Array[String](["一颗奇怪的种子……\n或许，\n它还活着呢？", "突破土壤……\n它居然\n发芽了？！", "你说，它会有怎样的故事呢？"])
+paper_color = Color(0.964706, 0.945098, 0.901961, 1)
+next_scene = ExtResource("5")

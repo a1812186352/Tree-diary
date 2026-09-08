@@ -1,0 +1,39 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/branch.gd" id="1"]
+
+[ext_resource type="Texture2D" path="res://arsset/nature/branch_1bud.png" id="art"]
+
+[node name="One_Bud" type="Node2D"]
+script = ExtResource("1")
+bud_count = 1
+is_base = false
+texture_rect = Rect2(-65.76087, -117.66304, 135.86957, 135.86957)
+sticker_texture = ExtResource("art")
+grown_texture = ExtResource("art")
+
+[node name="RootAnchor" type="Marker2D" parent="."]
+position = Vector2(0, 0)
+rotation = 0
+
+[node name="Buds" type="Node2D" parent="."]
+
+
+[node name="Tip" type="Marker2D" parent="Buds"]
+position = Vector2(5.97826, -100.00000)
+rotation = 0.000000
+
+[node name="BirdAnchors" type="Node2D" parent="."]
+
+
+[node name="Perch" type="Marker2D" parent="BirdAnchors"]
+position = Vector2(7.88043, -69.83696)
+rotation = 0.000000
+
+[node name="PestAirAnchor" type="Marker2D" parent="."]
+position = Vector2(2.71739, -72.82609)
+rotation = 0.000000
+
+[node name="OmenAnchor" type="Marker2D" parent="."]
+position = Vector2(2.71739, -50.00000)
+rotation = 0.000000

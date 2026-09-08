@@ -1,0 +1,40 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
+config_version=5
+
+[application]
+
+config/name="TREE v0.5"
+run/main_scene="res://scenes/opening/book_opening.tscn"
+config/features=PackedStringArray("4.7", "Forward Plus")
+config/icon="res://icon.svg"
+
+[autoload]
+
+OpeningMusic="*res://scripts/opening/opening_music.gd"
+PageAudio="*res://scripts/page_audio.gd"
+BookFrame="*res://scripts/book_frame.gd"
+
+[display]
+
+window/size/viewport_width=1920
+window/size/viewport_height=1080
+window/size/window_width_override=1280
+window/size/window_height_override=720
+window/stretch/mode="canvas_items"
+window/size/min_width=960
+window/size/min_height=540
+
+[physics]
+
+3d/physics_engine="Jolt Physics"
+
+[rendering]
+
+environment/defaults/default_clear_color=Color(0.870588, 0.835294, 0.760784, 1)

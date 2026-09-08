@@ -1,0 +1,202 @@
+[gd_scene format=3 uid="uid://dhxpjxd4pftfq"]
+
+[ext_resource type="Shader" uid="uid://d16u61bk3v11h" path="res://shaders/branch_paper.gdshader" id="4_85g3d"]
+[ext_resource type="Script" uid="uid://b5p452trrwhee" path="res://scripts/companion_system.gd" id="animals"]
+[ext_resource type="PackedScene" path="res://scenes/branches/base.tscn" id="base"]
+[ext_resource type="Resource" path="res://config/mvp.tres" id="config"]
+[ext_resource type="Script" uid="uid://dp7iyulr8fij1" path="res://scripts/ground_surface.gd" id="ground_surface"]
+[ext_resource type="Script" uid="uid://cble6kx7wjvb3" path="res://scripts/growth_system.gd" id="growth"]
+[ext_resource type="Script" uid="uid://wd6wpdfpi1x0" path="res://scripts/main.gd" id="main"]
+[ext_resource type="PackedScene" path="res://scenes/music_manager.tscn" id="music"]
+[ext_resource type="Script" uid="uid://bfd5geqpbyxx7" path="res://scripts/overlay.gd" id="overlay"]
+[ext_resource type="Script" uid="uid://buc6k71bb3ki6" path="res://scripts/phase_manager.gd" id="phase"]
+[ext_resource type="Script" uid="uid://1pcglfmmc14v" path="res://scripts/resource_system.gd" id="resources"]
+[ext_resource type="Script" path="res://scripts/foliage_system.gd" id="foliage"]
+[ext_resource type="Script" path="res://scripts/world_camera.gd" id="camera"]
+[ext_resource type="Script" path="res://scripts/landscape.gd" id="landscape"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_ya4ey"]
+shader = ExtResource("4_85g3d")
+shader_parameter/sticker = false
+shader_parameter/paper_width = 9.0
+shader_parameter/paper_color = Color(1, 0.98, 0.91, 1)
+
+[node name="Main" type="Node2D" unique_id=1435489277]
+texture_repeat = 1
+script = ExtResource("main")
+config = ExtResource("config")
+
+[node name="World" type="Node2D" parent="." unique_id=1820541588]
+
+[node name="Landscape" type="Node2D" parent="World"]
+script = ExtResource("landscape")
+
+[node name="GroundSurface" type="StaticBody2D" parent="World" unique_id=307750569]
+script = ExtResource("ground_surface")
+surface_points = PackedVector2Array(-160, 845, 38, 845, 222, 821, 499, 793, 960, 772, 1421, 794, 1698, 821, 1882, 845, 2080, 845)
+
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="World/GroundSurface" unique_id=394443580]
+polygon = PackedVector2Array(-160, 845, 38, 845, 222, 821, 499, 793, 960, 772, 1421, 794, 1698, 821, 1882, 845, 2080, 845, 2080, 1250, -160, 1250)
+
+[node name="Branches" type="Node2D" parent="World" unique_id=909381950]
+
+[node name="Base" parent="World/Branches" unique_id=135658695 instance=ExtResource("base")]
+material = SubResource("ShaderMaterial_ya4ey")
+position = Vector2(960, 800)
+scale = Vector2(2, 2)
+
+[node name="FoliageSystem" type="Node2D" parent="World"]
+script = ExtResource("foliage")
+
+[node name="Anchors" type="Node2D" parent="World" unique_id=596905252]
+
+[node name="PestGroundAnchor" type="Marker2D" parent="World/Anchors" unique_id=775856394]
+position = Vector2(960, 744)
+
+[node name="PestAirAnchor" type="Marker2D" parent="World/Anchors" unique_id=614559288]
+position = Vector2(960, 575)
+
+[node name="HeartAnchor" type="Marker2D" parent="World/Anchors" unique_id=639983643]
+visibility_layer = 512
+position = Vector2(180, 750)
+
+[node name="GroundEntryLeft" type="Marker2D" parent="World/Anchors" unique_id=823429247]
+position = Vector2(70, 744)
+
+[node name="GroundEntryRight" type="Marker2D" parent="World/Anchors" unique_id=2053171188]
+position = Vector2(1850, 744)
+
+[node name="BirdEntryLeft" type="Marker2D" parent="World/Anchors" unique_id=1166162128]
+position = Vector2(70, 210)
+
+[node name="BirdEntryRight" type="Marker2D" parent="World/Anchors" unique_id=1827569057]
+position = Vector2(1850, 210)
+
+[node name="GroundAnchors" type="Node2D" parent="World/Anchors" unique_id=2128088697]
+
+[node name="Ground1" type="Marker2D" parent="World/Anchors/GroundAnchors" unique_id=535120960]
+position = Vector2(790, 744)
+
+[node name="Ground2" type="Marker2D" parent="World/Anchors/GroundAnchors" unique_id=1780666377]
+position = Vector2(945, 744)
+
+[node name="Ground3" type="Marker2D" parent="World/Anchors/GroundAnchors" unique_id=2043733566]
+position = Vector2(1100, 744)
+
+[node name="BirdAnchors" type="Node2D" parent="World/Anchors" unique_id=1907211442]
+
+[node name="Bird1" type="Marker2D" parent="World/Anchors/BirdAnchors" unique_id=1293253576]
+position = Vector2(910, 575)
+
+[node name="Bird2" type="Marker2D" parent="World/Anchors/BirdAnchors" unique_id=528643542]
+position = Vector2(985, 575)
+
+[node name="Bird3" type="Marker2D" parent="World/Anchors/BirdAnchors" unique_id=1518430279]
+position = Vector2(1060, 575)
+
+[node name="ResourceSpawns" type="Node2D" parent="World/Anchors" unique_id=1436155417]
+
+[node name="Resource1" type="Marker2D" parent="World/Anchors/ResourceSpawns" unique_id=1386411497]
+position = Vector2(350, 340)
+
+[node name="Resource2" type="Marker2D" parent="World/Anchors/ResourceSpawns" unique_id=955973038]
+position = Vector2(470, 450)
+
+[node name="Resource3" type="Marker2D" parent="World/Anchors/ResourceSpawns" unique_id=2063194531]
+position = Vector2(300, 570)
+
+[node name="Resource4" type="Marker2D" parent="World/Anchors/ResourceSpawns" unique_id=1549918694]
+position = Vector2(550, 320)
+
+[node name="Resource5" type="Marker2D" parent="World/Anchors/ResourceSpawns" unique_id=667548583]
+position = Vector2(480, 625)
+
+[node name="Resource6" type="Marker2D" parent="World/Anchors/ResourceSpawns" unique_id=47329563]
+position = Vector2(640, 535)
+
+[node name="Resource7" type="Marker2D" parent="World/Anchors/ResourceSpawns" unique_id=1331029891]
+position = Vector2(1450, 340)
+
+[node name="Resource8" type="Marker2D" parent="World/Anchors/ResourceSpawns" unique_id=152721953]
+position = Vector2(1560, 440)
+
+[node name="Resource9" type="Marker2D" parent="World/Anchors/ResourceSpawns" unique_id=308253380]
+position = Vector2(1370, 535)
+
+[node name="Resource10" type="Marker2D" parent="World/Anchors/ResourceSpawns" unique_id=582329762]
+position = Vector2(1600, 620)
+
+[node name="Resource11" type="Marker2D" parent="World/Anchors/ResourceSpawns" unique_id=2028928252]
+position = Vector2(1280, 340)
+
+[node name="Resource12" type="Marker2D" parent="World/Anchors/ResourceSpawns" unique_id=267129069]
+position = Vector2(1440, 660)
+
+[node name="PestGroundEntryLeft" type="Marker2D" parent="World/Anchors" unique_id=213879474]
+position = Vector2(-100, 744)
+
+[node name="PestGroundEntryRight" type="Marker2D" parent="World/Anchors" unique_id=1375282005]
+position = Vector2(2020, 744)
+
+[node name="PestAirEntryLeft" type="Marker2D" parent="World/Anchors" unique_id=221039101]
+position = Vector2(-100, 210)
+
+[node name="PestAirEntryRight" type="Marker2D" parent="World/Anchors" unique_id=1625787899]
+position = Vector2(2020, 210)
+
+[node name="WorldCamera" type="Camera2D" parent="."]
+script = ExtResource("camera")
+
+[node name="HUD" type="CanvasLayer" parent="."]
+layer = 2
+
+[node name="Overlay" type="Node2D" parent="HUD" unique_id=642522401]
+z_index = 30
+script = ExtResource("overlay")
+clock_size = 180.0
+growth_tray_size = Vector2(820, 220)
+
+[node name="Effects" type="Node2D" parent="." unique_id=66643897]
+z_index = 26
+
+[node name="UI" type="CanvasLayer" parent="." unique_id=1202629478]
+layer = 3
+
+[node name="TraySlots" type="Node2D" parent="UI" unique_id=5535308]
+
+[node name="Tray1" type="Marker2D" parent="UI/TraySlots" unique_id=1663705444]
+position = Vector2(1030, 805)
+
+[node name="Tray2" type="Marker2D" parent="UI/TraySlots" unique_id=1471149675]
+position = Vector2(1230, 805)
+
+[node name="Tray3" type="Marker2D" parent="UI/TraySlots" unique_id=1741663582]
+position = Vector2(1432, 805)
+
+[node name="ResourcePocketAnchor" type="Marker2D" parent="UI" unique_id=414197716]
+position = Vector2(110, 780)
+
+[node name="ClockAnchor" type="Marker2D" parent="UI" unique_id=1060281753]
+position = Vector2(1720, 260)
+
+[node name="GrowthTrayAnchor" type="Marker2D" parent="UI" unique_id=1296144048]
+position = Vector2(953, 780)
+
+[node name="RestartAnchor" type="Marker2D" parent="UI" unique_id=98595898]
+position = Vector2(820, 650)
+
+[node name="Systems" type="Node" parent="." unique_id=1657099528]
+
+[node name="MusicManager" parent="Systems" unique_id=250961239 instance=ExtResource("music")]
+
+[node name="PhaseManager" type="Node" parent="Systems" unique_id=1970988258]
+script = ExtResource("phase")
+
+[node name="ResourceSystem" type="Node" parent="Systems" unique_id=1350307325]
+script = ExtResource("resources")
+
+[node name="GrowthSystem" type="Node" parent="Systems" unique_id=1324311806]
+script = ExtResource("growth")
+
+[node name="CompanionSystem" type="Node" parent="Systems" unique_id=313766608]
+script = ExtResource("animals")

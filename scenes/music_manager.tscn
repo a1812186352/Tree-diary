@@ -1,0 +1,32 @@
+[gd_scene load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://scripts/music_manager.gd" id="1"]
+[ext_resource type="AudioStream" path="res://arsset/music/白昼.mp3" id="day"]
+[ext_resource type="AudioStream" path="res://arsset/music/夜晚.mp3" id="night"]
+[ext_resource type="AudioStream" path="res://arsset/music/UI-按钮点击.mp3" id="hover"]
+[ext_resource type="AudioStream" path="res://arsset/music/UI-贴纸放置.mp3" id="place"]
+[ext_resource type="AudioStream" path="res://arsset/music/纸张翻页-厚重.mp3" id="page"]
+[ext_resource type="AudioStream" path="res://arsset/music/坚果出击.mp3" id="throw"]
+[ext_resource type="AudioStream" path="res://arsset/music/昆虫死亡.mp3" id="death"]
+[ext_resource type="AudioStream" path="res://arsset/music/树皮受击-闷响.mp3" id="hurt"]
+[ext_resource type="AudioStream" path="res://arsset/music/阳光拾取.mp3" id="sun"]
+[ext_resource type="AudioStream" path="res://arsset/music/水拾取.mp3" id="water"]
+
+[node name="MusicManager" type="Node"]
+script = ExtResource("1")
+day_music = ExtResource("day")
+dusk_music = ExtResource("day")
+night_music = ExtResource("night")
+music_volume = 0.4
+fade_seconds = 0.8
+effects_volume = 0.7
+effects = Dictionary[String, AudioStream]({
+"hover": ExtResource("hover"),
+"place": ExtResource("place"),
+"page": ExtResource("page"),
+"throw": ExtResource("throw"),
+"death": ExtResource("death"),
+"hurt": ExtResource("hurt"),
+"sun": ExtResource("sun"),
+"water": ExtResource("water")
+})

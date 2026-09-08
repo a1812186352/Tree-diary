@@ -1,0 +1,21 @@
+[gd_resource type="Resource" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/opening/opening_config.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/opening/book_cover.png" id="2"]
+[ext_resource type="VideoStream" path="res://assets/opening/book_open.ogv" id="3"]
+
+[resource]
+script = ExtResource("1")
+cover_texture = ExtResource("2")
+video_stream = ExtResource("3")
+video_duration = 5.042
+paper_color = Color(0.964706, 0.945098, 0.901961, 1)
+video_volume = 1.0
+button_text = "开始阅读  ›"
+button_position_uv = Vector2(0.76, 0.493)
+button_size_uv = Vector2(0.195, 0.078)
+next_scene = "res://scenes/opening/story_opening.tscn"
+chapter_text = "序  章"
+skip_text = "跳过开篇  ›"
+chapter_rect_uv = Rect2(0.02, 0.022, 0.205, 0.098)
+skip_rect_uv = Rect2(0.775, 0.89, 0.225, 0.11)

@@ -1,0 +1,113 @@
+[gd_resource type="Resource" script_class="" load_steps=32 format=3]
+
+[ext_resource type="Script" path="res://scripts/game_config.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/endings/ending_survival.png" id="ending_survival"]
+[ext_resource type="Texture2D" path="res://assets/endings/ending_invasion.png" id="ending_invasion"]
+
+[ext_resource type="Texture2D" path="res://arsset/nature/sky_day.png" id="day"]
+
+[ext_resource type="Texture2D" path="res://arsset/nature/sky_dusk.png" id="dusk"]
+
+[ext_resource type="Texture2D" path="res://arsset/nature/sky_night.png" id="night"]
+
+[ext_resource type="Texture2D" path="res://arsset/nature/pest_ground_1.png" id="pg1"]
+
+[ext_resource type="Texture2D" path="res://arsset/nature/pest_ground_2.png" id="pg2"]
+
+[ext_resource type="Texture2D" path="res://arsset/nature/pest_ground_3.png" id="pg3"]
+
+[ext_resource type="Texture2D" path="res://arsset/nature/pest_air_1.png" id="pa1"]
+
+[ext_resource type="Texture2D" path="res://arsset/nature/pest_air_2.png" id="pa2"]
+
+[ext_resource type="Texture2D" path="res://arsset/nature/pest_air_3.png" id="pa3"]
+
+[ext_resource type="Texture2D" path="res://arsset/nature/acorn.png" id="ac"]
+
+[ext_resource type="Texture2D" path="res://arsset/nature/feather.png" id="fe"]
+
+[ext_resource type="Texture2D" path="res://arsset/nature/ground_grass.png" id="gg"]
+
+[ext_resource type="Texture2D" path="res://arsset/nature/hill_arc.png" id="ha"]
+
+[ext_resource type="Texture2D" path="res://arsset/ui/panel_clipboard.png" id="pc"]
+
+[ext_resource type="Texture2D" path="res://arsset/ui/panel_paper.png" id="pp"]
+
+[ext_resource type="Texture2D" path="res://arsset/ui/title_banner.png" id="tb"]
+[ext_resource type="Texture2D" path="res://assets/foliage/rear_canopy_atlas.png" id="foliage_rear"]
+[ext_resource type="Texture2D" path="res://assets/foliage/middle_leaves_atlas.png" id="foliage_middle"]
+[ext_resource type="Texture2D" path="res://assets/foliage/front_sprays_atlas.png" id="foliage_front"]
+
+[ext_resource type="Texture2D" path="res://arsset/ui/title_card.png" id="tc"]
+
+[ext_resource type="Texture2D" path="res://arsset/ui/icon_pause.png" id="ipause"]
+
+[ext_resource type="Texture2D" path="res://arsset/ui/icon_play.png" id="iplay"]
+
+[ext_resource type="Texture2D" path="res://arsset/ui/icon_settings.png" id="iset"]
+
+[ext_resource type="Texture2D" path="res://arsset/ui/icon_resume.png" id="iresume"]
+
+[ext_resource type="Texture2D" path="res://arsset/ui/page_turn.png" id="pt"]
+
+[ext_resource type="Texture2D" path="res://assets/ui/branch_cards/card_1bud.tres" id="t1"]
+
+[ext_resource type="Texture2D" path="res://assets/ui/branch_cards/card_2bud.tres" id="t2"]
+
+[ext_resource type="Texture2D" path="res://assets/ui/branch_cards/card_3bud.tres" id="t3"]
+
+[resource]
+script = ExtResource("1")
+ending_survival_texture = ExtResource("ending_survival")
+ending_invasion_texture = ExtResource("ending_invasion")
+ending_survival_title = ""
+ending_survival_text = "小树长成了大树，\n这颗树真的长出了能容纳生命的地方...."
+ending_invasion_title = ""
+ending_invasion_text = "树木被昆虫们占领了，\n下一次，考虑一下和小动物们合作吧"
+
+sky_day = ExtResource("day")
+sky_dusk = ExtResource("dusk")
+sky_night = ExtResource("night")
+sky_size = Vector2(3000, 1688)
+sky_center = Vector2(960, 400)
+growth_bounds = Rect2(-1440, -2400, 4800, 3155)
+
+day_duration = 40.0
+dusk_duration = 10.0
+night_duration = 30.0
+page_duration = 1.55
+swap_progress = 0.48
+page_paper_color = Color(0.960784, 0.945098, 0.898039, 1)
+page_curl_strength = 0.75
+page_shadow_strength = 0.30
+page_grain_strength = 0.012
+
+foliage_rear_atlas = ExtResource("foliage_rear")
+foliage_middle_atlas = ExtResource("foliage_middle")
+foliage_front_atlas = ExtResource("foliage_front")
+foliage_rear_opacity = 0.78
+foliage_middle_per_branch = 2
+foliage_middle_scale = 0.52
+foliage_front_chance = 0.58
+foliage_front_scale = 0.43
+foliage_front_opacity = 0.94
+
+pest_ground_textures = Array[Texture2D]([ExtResource("pg1"), ExtResource("pg2"), ExtResource("pg3")])
+pest_air_textures = Array[Texture2D]([ExtResource("pa1"), ExtResource("pa2"), ExtResource("pa3")])
+acorn_texture = ExtResource("ac")
+acorn_daily_min = 1
+acorn_daily_max = 3
+acorn_probability = 0.3
+feather_texture = ExtResource("fe")
+
+panel_texture = ExtResource("pc")
+title_banner_texture = ExtResource("tb")
+icon_pause = ExtResource("ipause")
+icon_play = ExtResource("iplay")
+icon_settings = ExtResource("iset")
+icon_restart = ExtResource("iresume")
+icon_resume = ExtResource("iresume")
+tray_textures = Array[Texture2D]([ExtResource("t1"), ExtResource("t2"), ExtResource("t3")])
+ground_texture = ExtResource("gg")
+hill_texture = ExtResource("ha")
