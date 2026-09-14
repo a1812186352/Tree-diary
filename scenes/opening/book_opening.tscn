@@ -1,9 +1,9 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene format=3 uid="uid://pb5hlb68uhme"]
 
-[ext_resource type="Script" path="res://scripts/opening/book_opening.gd" id="1"]
+[ext_resource type="Script" uid="uid://c1h75nyppshfi" path="res://scripts/opening/book_opening.gd" id="1"]
 [ext_resource type="Resource" path="res://config/opening.tres" id="2"]
 
-[node name="BookOpening" type="Control"]
+[node name="BookOpening" type="Control" unique_id=222437211]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0

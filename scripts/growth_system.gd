@@ -48,26 +48,14 @@ func validate(branch: Node2D, bud: Node2D, cost: int, angle: float = 0) -> Strin
 	if absf(angle) > config.rotation_limit_degrees:
 		return "转得太远了，靠近芽点生长方向试试"
 	if records.size() >= config.max_branches or bud.get_parent().get_parent().depth >= config.max_depth:
-		return "这棵树已达到本次试作的生长上限"
+		return "这棵树已达到生长上限"
 	var start: Vector2 = branch.root_position()
 	var end: Vector2 = branch.tip_position()
 	if not config.allow_downward and end.y >= start.y:
-		return "本次试作先向上方生长"
+		return "请朝上方生长"
 	for slot in branch.buds():
 		if not config.growth_bounds.has_point(slot.global_position):
 			return "枝条超出纸页，请换个角度"
-	for other in branch_root.get_children():
-		if other == branch or other.preview:
-			continue
-		var a: Vector2 = other.root_position()
-		var b: Vector2 = other.tip_position()
-		# Permit overlap only at the joint; keep the rest of each branch clear.
-		for fraction in [0.35, 0.5, 0.7, 0.85, 1.0]:
-			var sample := start.lerp(end, fraction)
-			if sample.distance_to(Geometry2D.get_closest_point_to_segment(sample, a, b)) < config.collision_clearance:
-				return "枝条相碰了，旋转后再试试"
-		if Geometry2D.segment_intersects_segment(start.lerp(end, 0.25), end, a, b) != null:
-			return "枝条相碰了，旋转后再试试"
 	return ""
 
 func place(kind: int, bud: Node2D, angle: float, mirrored: bool, day: int) -> Node2D:
@@ -153,7 +141,6 @@ func remove_nearest(point: Vector2, max_distance: float) -> bool:
 		if not removed_omen_ids.is_empty():
 			animals.companions = animals.companions.filter(func(c):
 				return not removed_omen_ids.has(c.get("omen_id", -1)))
-			animals.refresh_homes()
 	best.queue_free()
 	return true
 

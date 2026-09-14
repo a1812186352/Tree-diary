@@ -50,27 +50,12 @@ script = ExtResource("foliage")
 
 [node name="Anchors" type="Node2D" parent="World" unique_id=596905252]
 
-[node name="PestGroundAnchor" type="Marker2D" parent="World/Anchors" unique_id=775856394]
-position = Vector2(960, 744)
-
 [node name="PestAirAnchor" type="Marker2D" parent="World/Anchors" unique_id=614559288]
 position = Vector2(960, 575)
 
 [node name="HeartAnchor" type="Marker2D" parent="World/Anchors" unique_id=639983643]
 visibility_layer = 512
 position = Vector2(180, 750)
-
-[node name="GroundEntryLeft" type="Marker2D" parent="World/Anchors" unique_id=823429247]
-position = Vector2(70, 744)
-
-[node name="GroundEntryRight" type="Marker2D" parent="World/Anchors" unique_id=2053171188]
-position = Vector2(1850, 744)
-
-[node name="BirdEntryLeft" type="Marker2D" parent="World/Anchors" unique_id=1166162128]
-position = Vector2(70, 210)
-
-[node name="BirdEntryRight" type="Marker2D" parent="World/Anchors" unique_id=1827569057]
-position = Vector2(1850, 210)
 
 [node name="GroundAnchors" type="Node2D" parent="World/Anchors" unique_id=2128088697]
 
@@ -131,18 +116,6 @@ position = Vector2(1280, 340)
 
 [node name="Resource12" type="Marker2D" parent="World/Anchors/ResourceSpawns" unique_id=267129069]
 position = Vector2(1440, 660)
-
-[node name="PestGroundEntryLeft" type="Marker2D" parent="World/Anchors" unique_id=213879474]
-position = Vector2(-100, 744)
-
-[node name="PestGroundEntryRight" type="Marker2D" parent="World/Anchors" unique_id=1375282005]
-position = Vector2(2020, 744)
-
-[node name="PestAirEntryLeft" type="Marker2D" parent="World/Anchors" unique_id=221039101]
-position = Vector2(-100, 210)
-
-[node name="PestAirEntryRight" type="Marker2D" parent="World/Anchors" unique_id=1625787899]
-position = Vector2(2020, 210)
 
 [node name="WorldCamera" type="Camera2D" parent="."]
 script = ExtResource("camera")

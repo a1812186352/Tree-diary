@@ -1,6 +1,6 @@
 extends Control
 const Layout = preload("res://scripts/book_layout.gd")
-## Self-contained opening. Connect opening_finished to the future story sequence.
+## Book cover and opening video leading into the story pages.
 signal opening_finished
 
 enum Stage { COVER, STARTING, PLAYING, PAPER }
@@ -22,7 +22,11 @@ var button_transition: Tween
 var cover_transition: Tween
 var chapter_tab: Button
 var skip_button: Button
+var settings_button: Button
+var settings_panel: Control
 var backdrop_material: ShaderMaterial
+@onready var user_settings: Node = get_node("/root/UserSettings")
+var video_gain: float = 1.0
 
 func _ready() -> void:
 	get_node("/root/OpeningMusic").start()
@@ -53,7 +57,8 @@ func _ready() -> void:
 	video.expand = true
 	video.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	video.stream = config.video_stream
-	video.volume = config.video_volume
+	_apply_video_volume()
+	user_settings.audio_changed.connect(_apply_video_volume)
 	video.finished.connect(_finish_to_paper)
 	add_child(video)
 	cover = TextureRect.new()
@@ -74,10 +79,17 @@ func _ready() -> void:
 	skip_button = tab_script.new()
 	skip_button.name = "SkipOpening"
 	skip_button.caption = config.skip_text
-	skip_button.tooltip_text = "跳过视频，进入下一页"
+	skip_button.tooltip_text = "跳过开篇，直接进入第一天"
 	skip_button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	skip_button.pressed.connect(_skip_opening)
 	add_child(skip_button)
+	settings_button = tab_script.new()
+	settings_button.name = "CoverSettings"
+	settings_button.caption = "设置  ›"
+	settings_button.tooltip_text = "设置与操作说明"
+	settings_button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	settings_button.pressed.connect(_open_settings)
+	add_child(settings_button)
 	paper = ColorRect.new()
 	paper.name = "PaperTransition"
 	paper.color = config.paper_color
@@ -131,7 +143,13 @@ func _ready() -> void:
 	if video.stream == null or cover.texture == null:
 		error_label.text = "开场素材未能载入，请确认 assets/opening 文件夹完整。"
 		read_button.disabled = true
-	print("OPENING_READY")
+
+func _apply_video_volume() -> void:
+	video.volume = config.video_volume * user_settings.music_volume * video_gain
+
+func _set_video_gain(value: float) -> void:
+	video_gain = value
+	_apply_video_volume()
 
 func _configure_paper_gradient() -> void:
 	if config.cover_texture == null:
@@ -180,6 +198,8 @@ func _layout_media() -> void:
 	chapter_tab.size = media_size * config.chapter_rect_uv.size
 	skip_button.position = media_position + media_size * config.skip_rect_uv.position
 	skip_button.size = media_size * config.skip_rect_uv.size
+	settings_button.position = media_position + Vector2(0, media_size.y * config.skip_rect_uv.position.y)
+	settings_button.size = media_size * config.skip_rect_uv.size
 	read_button.size = media_size * config.button_size_uv
 	read_button.position = media_position + media_size * config.button_position_uv
 	read_button.pivot_offset = read_button.size * 0.5
@@ -187,6 +207,19 @@ func _layout_media() -> void:
 	return_button.size = Vector2(170, 48)
 	error_label.position = Vector2(160, 946)
 	error_label.size = Vector2(1400, 50)
+
+func _open_settings() -> void:
+	if stage != Stage.COVER or is_instance_valid(settings_panel):
+		return
+	settings_panel = preload("res://scripts/settings_panel.gd").new()
+	settings_panel.closed.connect(_close_settings)
+	add_child(settings_panel)
+
+func _close_settings() -> void:
+	if is_instance_valid(settings_panel):
+		remove_child(settings_panel)
+		settings_panel.queue_free()
+	settings_panel = null
 
 func _hover(entered: bool) -> void:
 	if stage != Stage.COVER:
@@ -197,8 +230,9 @@ func _hover(entered: bool) -> void:
 	hover_transition.tween_property(read_button, "scale", Vector2.ONE * (1.025 if entered else 1.0), 0.18)
 
 func _start_reading() -> void:
-	if stage != Stage.COVER or read_button.disabled:
+	if stage != Stage.COVER or read_button.disabled or is_instance_valid(settings_panel):
 		return
+	settings_button.hide()
 	stage = Stage.STARTING
 	read_button.disabled = true
 	error_label.text = ""
@@ -209,8 +243,9 @@ func _start_reading() -> void:
 		return
 	read_button.hide()
 	playback_wait = 0.0
+	_set_video_gain(1.0)
+	get_node("/root/OpeningMusic").pause_for_video()
 	video.play()
-	print("OPENING_PLAY_REQUESTED")
 
 func _process(delta: float) -> void:
 	if stage == Stage.STARTING and not read_button.visible:
@@ -220,7 +255,6 @@ func _process(delta: float) -> void:
 			stage = Stage.PLAYING
 			cover_transition = create_tween()
 			cover_transition.tween_property(cover, "modulate:a", 0.0, 0.10)
-			print("OPENING_VIDEO_LIVE")
 		elif playback_wait > 5.0:
 			_return_to_cover()
 			error_label.text = "视频暂时未能播放，请点击开始阅读重试。"
@@ -236,11 +270,11 @@ func _finish_to_paper() -> void:
 	paper_transition = create_tween()
 	paper_transition.set_parallel(true)
 	paper_transition.tween_property(paper, "modulate:a", 1.0, 0.55)
-	paper_transition.tween_property(video, "volume", 0.0, 0.55)
+	paper_transition.tween_method(_set_video_gain, video_gain, 0.0, 0.55)
 	await paper_transition.finished
 	video.stop()
+	get_node("/root/OpeningMusic").start()
 	stage = Stage.PAPER
-	print("OPENING_PAPER_READY")
 	opening_finished.emit()
 	if not config.next_scene.is_empty():
 		var change_error := get_tree().change_scene_to_file(config.next_scene)
@@ -248,18 +282,29 @@ func _finish_to_paper() -> void:
 			error_label.text = "下一页暂时无法打开。"
 			return_button.show()
 	else:
-		# Standalone review only; the future story scene takes over this paper.
+		# Allow returning to the cover when no next scene is configured.
 		return_button.show()
 
 func _skip_opening() -> void:
-	if stage == Stage.PAPER or fade_started:
+	if stage == Stage.PAPER or fade_started or is_instance_valid(settings_panel):
 		return
-	if button_transition:
-		button_transition.kill()
+	for transition in [button_transition, cover_transition, hover_transition, paper_transition]:
+		if transition:
+			transition.kill()
+	stage = Stage.PAPER
+	fade_started = true
+	video.stop()
 	read_button.hide()
 	read_button.disabled = true
-	stage = Stage.PLAYING
-	_finish_to_paper()
+	skip_button.disabled = true
+	var story_config: Resource = load("res://config/story.tres")
+	var opening_music: Node = get_node("/root/OpeningMusic")
+	var change_error: Error = get_tree().change_scene_to_packed(story_config.next_scene)
+	if change_error == OK:
+		opening_music.pause_for_gameplay()
+	else:
+		error_label.text = "游戏暂时无法打开。"
+		return_button.show()
 
 func _return_to_cover() -> void:
 	if button_transition:
@@ -271,7 +316,8 @@ func _return_to_cover() -> void:
 	if paper_transition:
 		paper_transition.kill()
 	video.stop()
-	video.volume = config.video_volume
+	_set_video_gain(1.0)
+	get_node("/root/OpeningMusic").start()
 	skip_button.disabled = false
 	skip_button.mouse_filter = Control.MOUSE_FILTER_STOP
 	stage = Stage.COVER
@@ -282,12 +328,17 @@ func _return_to_cover() -> void:
 	read_button.disabled = false
 	read_button.scale = Vector2.ONE
 	read_button.show()
+	settings_button.show()
 	return_button.hide()
 	error_label.text = ""
-	print("OPENING_RETURNED")
 
 func _unhandled_key_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
+		if is_instance_valid(settings_panel):
+			if event.keycode == KEY_ESCAPE:
+				settings_panel.back()
+			get_viewport().set_input_as_handled()
+			return
 		if event.keycode == KEY_ESCAPE and stage != Stage.COVER:
 			_return_to_cover()
 			get_viewport().set_input_as_handled()

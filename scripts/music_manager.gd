@@ -36,8 +36,11 @@ var _players: Array[AudioStreamPlayer] = []
 var _gains: Array[float] = [0.0, 0.0]
 var _active: int = 0
 var _fade: Tween
+@onready var user_settings: Node = get_node("/root/UserSettings")
 
 func _ready() -> void:
+	user_settings.audio_changed.connect(_apply_user_settings)
+	_apply_user_settings()
 	for i in range(2):
 		var player := AudioStreamPlayer.new()
 		player.name = "MusicPlayer%d" % (i + 1)
@@ -57,6 +60,10 @@ func _ready() -> void:
 	if phase != null:
 		phase.changed.connect(_on_phase_changed)
 		_on_phase_changed(phase.phase)
+
+func _apply_user_settings() -> void:
+	music_volume = user_settings.music_volume
+	effects_volume = user_settings.effects_volume
 
 func _on_phase_changed(next: String) -> void:
 	if next == "GAMEOVER":

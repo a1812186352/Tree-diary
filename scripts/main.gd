@@ -19,15 +19,22 @@ const ReadingSpread = preload("res://scripts/reading_spread.gd")
 var hearts: int = 3
 var selected_kind: int = -1
 var preview: Node2D
+var preview_mirrored: bool = false
+var preview_angle: float = 0.0
 var candidate: Node2D
 var pointer := Vector2.ZERO
 var dragging: bool = false
+var animal_drag: Dictionary = {}
+var animal_drag_offset: Vector2 = Vector2.ZERO
+var animal_drop_node: Node2D
 var status: String = "点击收集阳光与水滴，再把枝条拖到芽点"
 var hint_time: float = 0
 var page_swapped: bool = false
 var page_turn: CanvasLayer
 var buttons: Array[Button] = []
 var time_scale: float = 1.0
+var game_speed: float = 1.0
+var speed_button: Button
 var sky_previous: String = "DAY"
 var sky_current: String = "DAY"
 var sky_progress: float = 1
@@ -41,6 +48,7 @@ enum MenuMode { NONE, PAUSED, SETTINGS, RESTART_CONFIRM }
 var menu_mode: int = MenuMode.NONE
 var menu_buttons: Array[Button] = []
 var settings_controls: Array[Control] = []
+var settings_panel: Control
 
 func _ready() -> void:
 	if config == null:
@@ -75,6 +83,7 @@ func _ready() -> void:
 func _on_view_changed() -> void:
 	pointer = world_camera.screen_to_world(get_viewport().get_mouse_position())
 	_update_preview()
+	_update_animal_drag(get_viewport().get_mouse_position())
 	queue_redraw()
 	overlay.queue_redraw()
 
@@ -161,6 +170,31 @@ func _build_menu_buttons() -> void:
 			btn.pressed.connect(_open_settings)
 		$UI.add_child(btn)
 		menu_buttons.append(btn)
+	speed_button = Button.new()
+	speed_button.name = "TopBarBtnSpeed"
+	speed_button.position = Vector2(1628, 88)
+	speed_button.size = Vector2(60, 60)
+	speed_button.z_index = 30
+	speed_button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	speed_button.add_theme_font_override("font", title_font)
+	speed_button.add_theme_font_size_override("font_size", 24)
+	speed_button.add_theme_color_override("font_color", Color("725c3f"))
+	speed_button.add_theme_color_override("font_hover_color", Color("475d36"))
+	speed_button.add_theme_color_override("font_pressed_color", Color("475d36"))
+	_apply_icon_style(speed_button, null)
+	speed_button.text = "1×"
+	speed_button.tooltip_text = "当前正常速度 · 点击切换2倍速"
+	speed_button.pressed.connect(_toggle_game_speed)
+	$UI.add_child(speed_button)
+	menu_buttons.append(speed_button)
+
+func _toggle_game_speed() -> void:
+	if menu_mode != MenuMode.NONE or phase.phase not in ["DAY", "DUSK", "NIGHT"]:
+		return
+	game_speed = 2.0 if game_speed == 1.0 else 1.0
+	time_scale = game_speed
+	speed_button.text = "2×" if game_speed == 2.0 else "1×"
+	speed_button.tooltip_text = "当前2倍速 · 点击恢复正常速度" if game_speed == 2.0 else "当前正常速度 · 点击切换2倍速"
 
 func _apply_icon_style(button: Button, icon: Texture2D) -> void:
 	_bind_ui_audio(button)
@@ -195,9 +229,10 @@ func _show_menu(mode: int) -> void:
 		return
 	if menu_mode == mode:
 		return
+	_cancel_animal_drag()
 	_clear_menu_action_buttons()
 	menu_mode = mode
-	time_scale = 1.0 if mode == MenuMode.NONE else 0.0
+	time_scale = game_speed if mode == MenuMode.NONE else 0.0
 	var opening: bool = mode != MenuMode.NONE
 	# Tell overlay to draw menu panel on top; overlay will skip game UI while menu is open.
 	overlay.menu_mode = mode
@@ -211,15 +246,15 @@ func _show_menu(mode: int) -> void:
 	if mode == MenuMode.PAUSED:
 		_make_menu_action_button("继续", _hide_menu, 0.5, 0.32)
 		_make_menu_action_button("重新开始", _confirm_restart, 0.5, 0.47)
-		_make_menu_action_button("回到标题", _do_quit, 0.5, 0.62)
+		_make_menu_action_button("回到标题", _return_to_title, 0.5, 0.62)
 	elif mode == MenuMode.SETTINGS:
 		_build_settings_controls()
-		_make_menu_action_button("返回", _hide_menu, 0.5, 0.83)
 	elif mode == MenuMode.RESTART_CONFIRM:
 		_make_menu_action_button("是的，重新开始", _do_restart, 0.5, 0.55)
 		_make_menu_action_button("再想想", _hide_menu, 0.5, 0.72)
 
 func _clear_menu_action_buttons() -> void:
+	settings_panel = null
 	for control in settings_controls:
 		control.queue_free()
 	settings_controls.clear()
@@ -260,34 +295,11 @@ func _make_menu_action_button(text: String, callback: Callable, fx: float, fy: f
 	menu_buttons.append(btn)
 
 func _build_settings_controls() -> void:
-	_add_settings_slider("怪物刷新间隔（秒，越小越密集）", 360, 0.3, 5.0, 0.1, config.pest_interval, func(value): config.pest_interval = value)
-	var music = $Systems/MusicManager
-	_add_settings_slider("背景音乐音量", 460, 0, 100, 1, music.music_volume * 100, func(value): music.music_volume = value / 100.0)
-	_add_settings_slider("音效音量", 560, 0, 100, 1, music.effects_volume * 100, func(value): music.effects_volume = value / 100.0)
-
-func _add_settings_slider(title: String, y: float, low: float, high: float, step_size: float, initial: float, callback: Callable) -> void:
-	var label := Label.new()
-	label.position = Vector2(660, y)
-	label.add_theme_font_override("font", title_font)
-	label.add_theme_font_size_override("font_size", 22)
-	label.add_theme_color_override("font_color", Color("54654f"))
-	label.text = "%s  %.1f" % [title, initial]
-	label.z_index = 35
-	$UI.add_child(label)
-	settings_controls.append(label)
-	var slider := HSlider.new()
-	slider.position = Vector2(660, y + 38)
-	slider.size = Vector2(600, 30)
-	slider.min_value = low
-	slider.max_value = high
-	slider.step = step_size
-	slider.value = initial
-	slider.z_index = 35
-	slider.value_changed.connect(func(value):
-		label.text = "%s  %.1f" % [title, value]
-		callback.call(value))
-	$UI.add_child(slider)
-	settings_controls.append(slider)
+	settings_panel = preload("res://scripts/settings_panel.gd").new()
+	settings_panel.config = config
+	settings_panel.closed.connect(_hide_menu)
+	$UI.add_child(settings_panel)
+	settings_controls.append(settings_panel)
 
 func _hide_menu() -> void:
 	_show_menu(MenuMode.NONE)
@@ -304,11 +316,11 @@ func _confirm_restart() -> void:
 func _do_restart() -> void:
 	get_tree().reload_current_scene()
 
-func _do_quit() -> void:
-	get_tree().quit()
+func _return_to_title() -> void:
+	get_tree().change_scene_to_file("res://scenes/opening/book_opening.tscn")
 
 func _draw_menu(canvas: Node2D) -> void:
-	if menu_mode == MenuMode.NONE:
+	if menu_mode in [MenuMode.NONE, MenuMode.SETTINGS]:
 		return
 	# Backdrop
 	canvas.draw_rect(Rect2(0, 0, 1920, 1080), Color(0.25, 0.28, 0.22, 0.55))
@@ -374,10 +386,83 @@ func cancel_preview() -> void:
 		branches.remove_child(preview)
 		preview.queue_free()
 	preview = null
+	preview_mirrored = false
+	preview_angle = 0.0
 	candidate = null
 	selected_kind = -1
 	dragging = false
 	_refresh_tray_styles()
+
+func _cancel_animal_drag() -> void:
+	animal_drag = {}
+	animal_drop_node = null
+	overlay.queue_redraw()
+
+func _update_animal_drag(screen_point: Vector2) -> void:
+	if animal_drag.is_empty():
+		return
+	var desired: Vector2 = world_camera.screen_to_world(screen_point) + animal_drag_offset
+	animal_drag.position = desired
+	animal_drop_node = null
+	if not Layout.contains(screen_point) or get_viewport().gui_get_hovered_control() != null:
+		return
+	var nearest: float = minf(config.snap_radius, 56.0 / maxf(0.01, world_camera.zoom.x))
+	for bud in animals.relocation_nodes(animal_drag.id):
+		var distance: float = desired.distance_to(bud.global_position)
+		if distance < nearest:
+			nearest = distance
+			animal_drop_node = bud
+	if is_instance_valid(animal_drop_node):
+		animal_drag.position = animal_drop_node.global_position
+
+func _handle_animal_input(event: InputEvent) -> bool:
+	if phase.phase not in ["DUSK", "NIGHT"]:
+		return false
+	if event is InputEventMouseMotion and not animal_drag.is_empty():
+		_update_animal_drag(event.position)
+		overlay.queue_redraw()
+		return true
+	if not event is InputEventMouseButton:
+		return false
+	if not animal_drag.is_empty():
+		if event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
+			_cancel_animal_drag()
+			return true
+		if event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
+			_update_animal_drag(event.position)
+			if is_instance_valid(animal_drop_node):
+				animals.relocate_companion(animal_drag.id, animal_drop_node)
+			_cancel_animal_drag()
+			return true
+		return event.button_index == MOUSE_BUTTON_LEFT
+	if event.button_index != MOUSE_BUTTON_LEFT or not event.pressed:
+		return false
+	if get_viewport().gui_get_hovered_control() != null:
+		return false
+	var picked: Dictionary = {}
+	var nearest: float = 44.0
+	for actor in animals.companions:
+		if actor.state != "IDLE":
+			continue
+		var offset: Vector2 = Vector2(0, -25 if actor.kind == 1 else -32)
+		var center: Vector2 = world_camera.world_to_screen(actor.position + offset)
+		var distance: float = center.distance_to(event.position)
+		if distance < nearest:
+			nearest = distance
+			picked = actor
+	if picked.is_empty():
+		return false
+	animal_drag = picked.duplicate(true)
+	animal_drag.velocity = Vector2.ZERO
+	animal_drag_offset = picked.position - world_camera.screen_to_world(event.position)
+	world_camera.dragging = false
+	_update_animal_drag(event.position)
+	overlay.queue_redraw()
+	return true
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT and is_node_ready() and not Engine.is_editor_hint():
+		_cancel_animal_drag()
 
 func _input(event: InputEvent) -> void:
 	if Engine.is_editor_hint():
@@ -387,11 +472,24 @@ func _input(event: InputEvent) -> void:
 		return
 	if event is InputEventMouse and not Layout.contains(event.position):
 		world_camera.dragging = false
+		if not animal_drag.is_empty():
+			animal_drop_node = null
+			if event is InputEventMouseButton and not event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+				_cancel_animal_drag()
+			elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
+				_cancel_animal_drag()
 		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed and dragging:
 			cancel_preview()
 		return
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_ESCAPE:
+			if menu_mode == MenuMode.SETTINGS and is_instance_valid(settings_panel):
+				settings_panel.back()
+				get_viewport().set_input_as_handled()
+				return
+			if not animal_drag.is_empty():
+				_cancel_animal_drag()
+				return
 			if menu_mode != MenuMode.NONE:
 				_hide_menu()
 			else:
@@ -400,10 +498,22 @@ func _input(event: InputEvent) -> void:
 	if menu_mode != MenuMode.NONE:
 		world_camera.dragging = false
 		return
+	if _handle_animal_input(event):
+		get_viewport().set_input_as_handled()
+		return
 	if world_camera.handle_input(event):
 		get_viewport().set_input_as_handled()
 		return
 	if phase.phase != "DAY" or placement_lock > 0:
+		return
+	if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_F:
+		if is_instance_valid(preview):
+			pointer = world_camera.screen_to_world(get_viewport().get_mouse_position())
+			_update_preview()
+			if is_instance_valid(candidate):
+				preview_mirrored = not preview_mirrored
+				_update_preview()
+				get_viewport().set_input_as_handled()
 		return
 	if event is InputEventMouseMotion:
 		pointer = world_camera.screen_to_world(event.position)
@@ -438,33 +548,30 @@ func _input(event: InputEvent) -> void:
 func _update_preview() -> void:
 	if not is_instance_valid(preview):
 		return
+	var previous_candidate: Node2D = candidate
 	candidate = growth.nearest_bud(pointer)
 	if candidate != null:
-		# Use the mouse position as the rotation target: stick the RootAnchor on the bud
-		# and rotate the preview so its default UP axis points toward the cursor.
-		var mouse_dir: Vector2 = (pointer - candidate.global_position).normalized()
-		var anchor_local: Vector2 = preview.get_node("RootAnchor").position
-		preview.scale = growth.branch_scale()
-		preview.rotation = Vector2.UP.angle_to(mouse_dir)
-		preview.global_position = candidate.global_position - preview.global_transform.basis_xform(anchor_local)
-		var bud_up: Vector2 = candidate.global_transform.basis_xform(Vector2.UP).normalized()
-		var offset_angle: float = rad_to_deg(bud_up.angle_to(mouse_dir))
-		var reason: String = growth.validate(preview, candidate, config.costs[selected_kind], offset_angle)
+		if candidate != previous_candidate:
+			preview_angle = 0.0
+		var mouse_dir: Vector2 = pointer - candidate.global_position
+		if mouse_dir.length_squared() > 1.0:
+			var bud_up: Vector2 = candidate.global_transform.basis_xform(Vector2.UP).normalized()
+			preview_angle = rad_to_deg(bud_up.angle_to(mouse_dir.normalized()))
+		growth.align(preview, candidate, preview_angle, preview_mirrored)
+		var reason: String = growth.validate(preview, candidate, config.costs[selected_kind], preview_angle)
 		preview.modulate = Color(0.8, 1.0, 0.8, 0.8) if reason.is_empty() else Color(1.0, 0.7, 0.65, 0.65)
 	else:
 		preview.global_position = pointer
+		preview.scale = growth.branch_scale() * Vector2(-1 if preview_mirrored else 1, 1)
 		preview.rotation = 0.0
-		preview.scale = growth.branch_scale()
 		preview.modulate = Color(1, 1, 1, 0.65)
 	preview.queue_redraw()
 
 func _commit_preview() -> void:
 	var created: Node2D = null
+	_update_preview()
 	if candidate != null:
-		var mouse_dir: Vector2 = (pointer - candidate.global_position).normalized()
-		var bud_up: Vector2 = candidate.global_transform.basis_xform(Vector2.UP).normalized()
-		var offset_angle: float = rad_to_deg(bud_up.angle_to(mouse_dir))
-		created = growth.place(selected_kind, candidate, offset_angle, false, phase.day)
+		created = growth.place(selected_kind, candidate, preview_angle, preview_mirrored, phase.day)
 	if created == null:
 		status = growth.last_reason if candidate != null else "没有贴到芽点，枝条已回到托盘"
 		pocket_shake = 0.6
@@ -499,6 +606,7 @@ func _on_pest_hit() -> void:
 		phase.finish("LOSE")
 
 func _on_phase_changed(next: String) -> void:
+	_cancel_animal_drag()
 	cancel_preview()
 	for button in buttons:
 		button.visible = next == "DAY" and menu_mode == MenuMode.NONE
@@ -511,20 +619,20 @@ func _on_phase_changed(next: String) -> void:
 		"DAY":
 			if not page_swapped:
 				_begin_resources_day()
-				animals.begin_day()
+				animals.begin_day(phase.day)
 			page_swapped = false
 			status = "点击收集阳光与水滴，再把枝条拖到芽点"
 		"DUSK":
 			resources.pickups.clear()
 			animals.begin_dusk(phase.day)
-			status = "昨天留下的痕迹，带来了今天的伙伴"
+			status = ""
 		"NIGHT":
 			animals.begin_night(phase.day - 1)
 			status = "让伙伴守护树木，等这一夜安静下来"
 		"PAGE_TURN":
 			page_swapped = false
 			status = "翻过一页，让昨日的枝条长成树"
-			page_turn.play(config.page_duration, config.swap_progress, config.page_paper_color,
+			page_turn.play(config.page_duration / game_speed, config.swap_progress, config.page_paper_color,
 				config.page_curl_strength, config.page_shadow_strength, config.page_grain_strength)
 		"GAMEOVER":
 			get_node("/root/PageAudio").play_page($Systems/MusicManager)
@@ -537,7 +645,8 @@ func _on_phase_changed(next: String) -> void:
 			$UI.add_child(ending)
 			$UI.move_child(ending, 0)
 			var won: bool = phase.result == "WIN"
-			ending.show_page(config.ending_survival_texture if won else config.ending_invasion_texture,
+			var ending_texture: Texture2D = _create_tree_portrait(ending) if won else config.ending_invasion_texture
+			ending.show_page(ending_texture,
 				config.ending_survival_title if won else config.ending_invasion_title,
 				config.ending_survival_text if won else config.ending_invasion_text)
 			var retry_btn: Button = $UI/Restart
@@ -549,6 +658,57 @@ func _on_phase_changed(next: String) -> void:
 		branch.show_hints = next == "DAY"
 		branch.queue_redraw()
 
+func _create_tree_portrait(owner_node: Node) -> Texture2D:
+	var viewport := SubViewport.new()
+	viewport.name = "TreePortrait"
+	viewport.size = Vector2i(880, 936)
+	viewport.transparent_bg = true
+	viewport.disable_3d = true
+	viewport.world_2d = World2D.new()
+	viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
+	owner_node.add_child(viewport)
+	var drawing := Node2D.new()
+	viewport.add_child(drawing)
+	var bounds := Rect2()
+	var has_bounds: bool = false
+	for branch in branches.get_children():
+		if branch.preview or branch.is_queued_for_deletion():
+			continue
+		var texture: Texture2D = branch.grown_texture if branch.grown else branch.sticker_texture
+		if texture == null:
+			continue
+		var copy := Sprite2D.new()
+		copy.texture = texture
+		copy.centered = false
+		copy.transform = branch.global_transform * Transform2D(0.0, branch.texture_rect.size / texture.get_size(), 0.0, branch.texture_rect.position)
+		if branch.material != null:
+			copy.material = branch.material.duplicate()
+		drawing.add_child(copy)
+		var rect: Rect2 = copy.transform * copy.get_rect()
+		bounds = bounds.merge(rect) if has_bounds else rect
+		has_bounds = true
+	for layer in foliage.get_children():
+		for leaf in layer.get_children():
+			if not leaf is Sprite2D or leaf.is_queued_for_deletion() or not leaf.is_visible_in_tree():
+				continue
+			var copy := Sprite2D.new()
+			copy.texture = leaf.texture
+			copy.centered = leaf.centered
+			copy.offset = leaf.offset
+			copy.transform = leaf.global_transform
+			copy.modulate = leaf.modulate
+			copy.z_index = layer.z_index + leaf.z_index
+			drawing.add_child(copy)
+			var rect: Rect2 = copy.transform * copy.get_rect()
+			bounds = bounds.merge(rect) if has_bounds else rect
+			has_bounds = true
+	if has_bounds:
+		var available: Vector2 = Vector2(viewport.size) - Vector2(96, 96)
+		var fit: float = minf(available.x / maxf(1, bounds.size.x), available.y / maxf(1, bounds.size.y))
+		drawing.scale = Vector2.ONE * fit
+		drawing.position = Vector2(viewport.size) * 0.5 - bounds.get_center() * fit
+	return viewport.get_texture()
+
 func _prepare_next_page() -> void:
 	if phase.phase != "PAGE_TURN":
 		return
@@ -557,9 +717,8 @@ func _prepare_next_page() -> void:
 	growth.mature(phase.day)
 	foliage.refresh()
 	animals.pests.clear()
-	animals.refresh_homes()
 	_begin_resources_day()
-	animals.begin_day()
+	animals.begin_day(phase.day)
 	sky_previous = "DAY"
 	sky_current = "DAY"
 	sky_progress = 1.0
@@ -581,7 +740,16 @@ func _finish_next_page() -> void:
 		overlay.queue_redraw()
 
 func _begin_resources_day() -> void:
-	resources.begin_day(config, anchors.get_node("ResourceSpawns"), world_camera.visible_world_rect())
+	var blocked: Array[Rect2] = []
+	if phase.day > 1:
+		for branch in branches.get_children():
+			if not branch.preview:
+				blocked.append((branch.global_transform * branch.texture_rect).grow(42))
+		for layer in foliage.get_children():
+			for leaf in layer.get_children():
+				if leaf is Sprite2D and not leaf.is_queued_for_deletion() and leaf.is_visible_in_tree():
+					blocked.append((leaf.global_transform * leaf.get_rect()).grow(42))
+	resources.begin_day(config, anchors.get_node("ResourceSpawns"), world_camera.visible_world_rect(), phase.day, blocked)
 
 func _process(delta: float) -> void:
 	if not is_node_ready():
@@ -596,7 +764,13 @@ func _process(delta: float) -> void:
 		return
 	# Paper animation owns the transition; no resource, animal or day timers
 	# advance until the new page has completely landed.
-	if phase.phase == "PAGE_TURN":
+	if phase.phase == "PAGE_TURN" or menu_mode != MenuMode.NONE:
+		return
+	if not animal_drag.is_empty() and not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+		_cancel_animal_drag()
+	if phase.phase in ["DUSK", "NIGHT"] and not animal_drag.is_empty():
+		queue_redraw()
+		overlay.queue_redraw()
 		return
 	var dt := delta * time_scale
 	placement_lock = maxf(0, placement_lock - dt)
@@ -616,7 +790,6 @@ func _process(delta: float) -> void:
 		"DUSK":
 			animals.tick_dusk(dt)
 			if phase.elapsed >= config.dusk_duration:
-				animals.finish_arrivals()
 				phase.enter("NIGHT")
 		"NIGHT":
 			animals.tick_night(dt)

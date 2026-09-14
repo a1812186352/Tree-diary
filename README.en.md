@@ -60,7 +60,8 @@ The main entry is `scenes/opening/book_opening.tscn`. The project uses the Forwa
 ### Open the book
 
 - Click **开始阅读** (Start reading) on the cover, or press **Enter / Space**.
-- Click **跳过开篇** (Skip opening) to skip the video and continue to the story pages.
+- Click **跳过开篇** (Skip opening) to enter day one directly.
+- The cover and gameplay share live volume settings. The opening video follows the music volume, with background music paused during playback.
 - Advance the story with the next-page button or **Enter / Space / Right Arrow**. On the final page, **进入第一天** (Enter day one) starts the game.
 
 ### Help the tree survive six days
@@ -81,6 +82,10 @@ Each day provides **6 sunlight and 6 water**. Unspent resources do not carry ove
 | Collect sunlight or water | Left-click the resource |
 | Place a branch | Hold the left mouse button on a tray branch, drag near a free bud, then release |
 | Aim a branch | Move the mouse while dragging; the branch points toward the cursor around the snapped bud |
+| Mirror a branch | Press F while snapped to a bud |
+| Move an animal | During dusk or night, drag a resting animal to a free bud; time pauses while dragging |
+| Change game speed | Click 1× / 2× at the top |
+| Toggle fullscreen | F11 |
 | Cancel a branch preview | Right-click |
 | Recover an immature branch placed that day | Right-click near its connection point to remove it and refund resources; mature branches cannot be removed |
 | Zoom | Mouse wheel, centered on the cursor |
@@ -89,7 +94,7 @@ Each day provides **6 sunlight and 6 water**. Unspent resources do not carry ove
 | Pause / close the menu | Esc, or use the buttons at the top of the screen |
 | Restart | Use the menu or the **再种一棵** (Grow another tree) button on the ending screen |
 
-A green-tinted preview indicates a valid placement; a red-tinted preview indicates an invalid one. If a branch cannot be placed, move closer to a free bud, adjust its direction, avoid other branches, or collect more resources.
+A green-tinted preview indicates a valid placement; a red-tinted preview indicates an invalid one. If a branch cannot be placed, move closer to a free bud, adjust its direction, or collect more resources.
 
 ## Troubleshooting
 

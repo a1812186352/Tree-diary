@@ -17,6 +17,7 @@ config/icon="res://icon.svg"
 
 [autoload]
 
+UserSettings="*res://scripts/user_settings.gd"
 OpeningMusic="*res://scripts/opening/opening_music.gd"
 PageAudio="*res://scripts/page_audio.gd"
 BookFrame="*res://scripts/book_frame.gd"

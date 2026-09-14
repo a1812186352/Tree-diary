@@ -8,9 +8,10 @@ var companions: Array[Dictionary] = []
 var pests: Array[Dictionary] = []
 var omens: Array[Dictionary] = []
 var wave: PackedInt32Array = PackedInt32Array()
-var spawned: int = 0
-var spawn_elapsed: float = 0
 var night_time: float = 0
+var spawn_clock: float = 0
+var spawn_events: Array[Dictionary] = []
+var last_spawn_times: Vector2 = Vector2(-100, -100)
 var dusk_time: float = 0
 var next_omen_id: int = 1
 var next_pest_id: int = 1
@@ -23,60 +24,145 @@ var rng := RandomNumberGenerator.new()
 # Cache the random draw, not the guarantee: moving the guaranteed acorn must
 # not turn several buds into permanent guaranteed successes after undoing.
 var acorn_rolls: Dictionary = {}
+var feather_rolls: Dictionary = {}
 
 func _ready() -> void:
 	rng.randomize()
 
-func add_growth_omen(branch: Node2D, day: int, base_junction_y: float) -> void:
+func _branch_layer(branch: Node2D, base_junction_y: float) -> int:
 	var height: float = maxf(0, base_junction_y - branch.tip_position().y)
-	var layer: int = maxi(1, ceili((height - 0.01) / config.vertical_layer_height))
-	var kind: int = 0 if layer <= config.ground_omen_max_layer else 1
-	if kind == 0:
-		if not _can_add_acorn(branch.parent_bud_id, day):
-			return
-	elif rng.randf() >= clampf(config.feather_probability, 0.0, 1.0):
-		return
-	var fraction := rng.randf_range(0.4, 0.7)
+	return maxi(1, ceili((height - 0.01) / maxf(1.0, config.vertical_layer_height)))
+
+func _omen_stock(kind: int) -> int:
+	var count: int = 0
+	for omen in omens:
+		if omen.kind == kind and not omen.assigned:
+			count += 1
+	return count
+
+func _append_omen(branch: Node2D, kind: int, eligible_day: int, layer: int) -> void:
+	var fraction: float = rng.randf_range(0.4, 0.7)
 	var p: Vector2 = branch.get_node("OmenAnchor").global_position + (branch.tip_position() - branch.root_position()) * (fraction - 0.5)
-	omens.append({"id": next_omen_id, "kind": kind, "position": p, "eligible_day": day + 1, "branch_id": branch.branch_id, "layer": layer, "assigned": false})
+	omens.append({"id": next_omen_id, "kind": kind, "position": p, "eligible_day": eligible_day, "branch_id": branch.branch_id, "layer": layer, "assigned": false})
 	next_omen_id += 1
 
-func _can_add_acorn(parent_bud_id: String, day: int) -> bool:
-	var maximum: int = maxi(0, config.acorn_daily_max)
-	var minimum: int = clampi(config.acorn_daily_min, 0, maximum)
+func add_growth_omen(branch: Node2D, day: int, base_junction_y: float) -> void:
+	var layer: int = _branch_layer(branch, base_junction_y)
+	var kind: int = 0 if layer <= config.ground_omen_max_layer else 1
+	if not _can_add_growth_omen(branch.parent_bud_id, day, kind):
+		return
+	_append_omen(branch, kind, day + 1, layer)
+
+func _can_add_growth_omen(parent_bud_id: String, day: int, kind: int) -> bool:
+	var maximum: int = maxi(0, config.acorn_daily_max if kind == 0 else config.feather_daily_max)
+	var minimum: int = clampi(config.acorn_daily_min if kind == 0 else config.feather_daily_min, 0, maximum)
+	var stock_max: int = maxi(0, config.acorn_stock_max if kind == 0 else config.feather_stock_max)
+	if _omen_stock(kind) >= stock_max:
+		return false
 	var count: int = 0
-	# Today's omens cannot be eaten until tomorrow. Counting the remaining
-	# records automatically releases a slot when a sticker is taken back.
 	for omen in omens:
-		if omen.kind == 0 and omen.eligible_day == day + 1:
+		if omen.kind == kind and omen.eligible_day == day + 1:
 			count += 1
 	if count >= maximum:
 		return false
+	var rolls: Dictionary = acorn_rolls if kind == 0 else feather_rolls
 	var key: String = "%d/%s" % [day, parent_bud_id]
-	if not acorn_rolls.has(key):
-		acorn_rolls[key] = rng.randf()
-	var roll: float = acorn_rolls[key]
-	return count < minimum or roll < clampf(config.acorn_probability, 0.0, 1.0)
+	if not rolls.has(key):
+		rolls[key] = rng.randf()
+	var probability: float = config.acorn_probability if kind == 0 else config.feather_probability
+	return count < minimum or float(rolls[key]) < clampf(probability, 0.0, 1.0)
 
-func home_positions(kind: int) -> Array[Vector2]:
-	var result: Array[Vector2] = []
-	var group: Node = anchors.get_node("GroundAnchors" if kind == 0 else "BirdAnchors")
-	for marker in group.get_children():
-		result.append(marker.global_position)
-	if kind == 1:
-		result.clear()
-		for branch in branch_root.get_children():
-			if branch.grown and not branch.is_base and not branch.preview:
-				for marker in branch.get_node("BirdAnchors").get_children():
-					result.append(marker.global_position)
-		# Manual fallback positions are configurable in the main scene.
-		for marker in group.get_children():
-			result.append(marker.global_position)
+func _replenish_acorns(day: int) -> void:
+	if config.acorn_replenish_targets.is_empty():
+		return
+	var target: int = clampi(config.acorn_replenish_targets[clampi(day - 1, 0, config.acorn_replenish_targets.size() - 1)], 0, mini(config.acorn_daily_max, config.companion_max_per_type))
+	var ready: int = 0
+	for omen in omens:
+		if omen.kind == 0 and not omen.assigned and omen.eligible_day <= day:
+			ready += 1
+	var base_y: float = branch_root.get_node("Base/Buds/Tip").global_position.y
+	for branch in branch_root.get_children():
+		if ready >= target or _omen_stock(0) >= config.acorn_stock_max:
+			break
+		if branch.is_base or branch.preview or not branch.grown:
+			continue
+		var layer: int = _branch_layer(branch, base_y)
+		if layer > config.ground_omen_max_layer:
+			continue
+		if omens.any(func(o): return o.kind == 0 and o.branch_id == branch.branch_id):
+			continue
+		_append_omen(branch, 0, day, layer)
+		ready += 1
+
+func _replenish_feathers(day: int) -> void:
+	if config.feather_replenish_targets.is_empty():
+		return
+	var target: int = clampi(config.feather_replenish_targets[clampi(day - 1, 0, config.feather_replenish_targets.size() - 1)], 0, mini(config.feather_daily_max, config.companion_max_per_type))
+	var ready: int = 0
+	for omen in omens:
+		if omen.kind == 1 and not omen.assigned and omen.eligible_day <= day:
+			ready += 1
+	var base_y: float = branch_root.get_node("Base/Buds/Tip").global_position.y
+	for branch in branch_root.get_children():
+		if ready >= target or _omen_stock(1) >= config.feather_stock_max:
+			break
+		if branch.is_base or branch.preview or not branch.grown:
+			continue
+		var layer: int = _branch_layer(branch, base_y)
+		if layer <= config.ground_omen_max_layer:
+			continue
+		if omens.any(func(o): return o.kind == 1 and o.branch_id == branch.branch_id):
+			continue
+		_append_omen(branch, 1, day, layer)
+		ready += 1
+
+func hamster_can_reach(origin: Vector2, destination: Vector2) -> bool:
+	var offset: Vector2 = destination - origin
+	var radius: Vector2 = config.hamster_attack_range
+	return Vector2(offset.x / maxf(1, radius.x), offset.y / maxf(1, radius.y)).length_squared() <= 1.0
+
+func _time_to_tree(pest: Dictionary) -> float:
+	var speed: float = (config.pest_speeds.x if pest.kind == 0 else config.pest_speeds.y) * pest.speed_factor
+	return maxf(0, pest.position.distance_to(pest.target) - config.hit_distance) / maxf(1, speed)
+
+func relocation_nodes(actor_id: int) -> Array[Node2D]:
+	var result: Array[Node2D] = []
+	for branch in branch_root.get_children():
+		if not branch.grown or branch.preview:
+			continue
+		for bud in branch.buds():
+			var free: bool = true
+			for actor in companions:
+				if actor.id == actor_id or actor.state == "LEAVING":
+					continue
+				if bud.global_position.distance_to(actor.home) < config.actor_spacing:
+					free = false
+					break
+			if free:
+				result.append(bud)
 	return result
 
-func refresh_homes() -> void:
-	# Keep tree-top homes and departure routes; maturation must not teleport actors.
-	pass
+func relocate_companion(actor_id: int, bud: Node2D) -> bool:
+	if not is_instance_valid(bud) or not relocation_nodes(actor_id).has(bud):
+		return false
+	for actor in companions:
+		if actor.id != actor_id or actor.state != "IDLE":
+			continue
+		var branch: Node2D = bud.get_parent().get_parent()
+		var destination: Vector2 = bud.global_position
+		actor.home = destination
+		actor.position = destination
+		actor.velocity = Vector2.ZERO
+		actor.target = -1
+		actor.route.clear()
+		var route: Array[Vector2] = []
+		if actor.kind == 0:
+			route = tree_route(branch.branch_id, destination)
+		else:
+			route.append(destination)
+		actor.climb_route = route
+		return true
+	return false
 
 func tree_route(branch_id: String, destination: Vector2) -> Array[Vector2]:
 	var chain: Array[Vector2] = [destination]
@@ -140,12 +226,6 @@ func tick_arrivals(delta: float) -> void:
 					actor.state = "EATING"
 					actor.eat_time = config.hamster_eat_seconds if actor.kind == 0 else 0.1
 
-func _too_close(point: Vector2, occupied: Array[Vector2]) -> bool:
-	for other in occupied:
-		if point.distance_to(other) < config.actor_spacing:
-			return true
-	return false
-
 func begin_dusk(day: int) -> void:
 	dusk_time = 0
 	visitors.clear()
@@ -158,15 +238,7 @@ func begin_dusk(day: int) -> void:
 				count += 1
 		if count >= config.companion_max_per_type:
 			continue
-		var spots := home_positions(omen.kind)
-		if spots.is_empty():
-			continue
-		var p: Vector2 = omen.position if omen.kind == 0 else spots[count % spots.size()]
-		var occupied: Array[Vector2] = []
-		for actor in companions:
-			occupied.append(actor.home)
-		while omen.kind != 0 and _too_close(p, occupied):
-			p.x += config.actor_spacing
+		var p: Vector2 = omen.position
 		var entry: Vector2 = entry_position(omen.kind, count % 2 == 0)
 		# Construct both routes with the same element type. A bare [p] in the
 		# conditional expression can produce an untyped Array for the first bird.
@@ -178,22 +250,161 @@ func begin_dusk(day: int) -> void:
 		var climb_route: Array[Vector2] = route.duplicate()
 		if omen.kind == 0:
 			route.push_front(Vector2(route[0].x, ground_y(route[0].x)))
-		companions.append({"route": route, "climb_route": climb_route, "exit": entry, "facing": 1.0 if entry.x < p.x else -1.0, "velocity": Vector2.ZERO, "speed_factor": rng.randf_range(0.9, 1.1), "cooldown": 0.0, "throw_flash": 0.0, "id": next_actor_id, "kind": omen.kind, "variant": count % 3, "position": entry, "home": p, "state": "ARRIVING", "target": -1, "omen_id": omen.id, "delay": config.arrival_interval * count})
+		companions.append({"route": route, "climb_route": climb_route, "exit": entry, "facing": 1.0 if entry.x < p.x else -1.0, "velocity": Vector2.ZERO, "speed_factor": rng.randf_range(0.9, 1.1), "cooldown": 0.0, "throw_flash": 0.0, "id": next_actor_id, "kind": omen.kind, "variant": (day + count + 1) % 3, "position": entry, "home": p, "state": "ARRIVING", "target": -1, "omen_id": omen.id, "delay": config.arrival_interval * count})
 		next_actor_id += 1
 		omen.assigned = true
 
-func tick_dusk(delta: float) -> bool:
+func tick_dusk(delta: float) -> void:
 	dusk_time += delta
 	animation_time += delta
 	tick_arrivals(delta)
-	return companions.all(func(a): return a.state == "IDLE")
 
 func begin_night(index: int) -> void:
 	wave = config.night_waves[index]
-	spawned = 0
 	night_time = 0
-	spawn_elapsed = 0
+	spawn_clock = 0
+	last_spawn_times = Vector2(-100, -100)
 	pests.clear()
+	projectiles.clear()
+	spawn_events.clear()
+	var times: PackedFloat32Array = PackedFloat32Array()
+	if index < config.night_spawn_times.size():
+		times = config.night_spawn_times[index]
+	var counts: Vector2i = Vector2i.ZERO
+	for i in range(mini(wave.size(), times.size())):
+		var kind: int = wave[i]
+		var ordinal: int = counts[kind]
+		counts[kind] += 1
+		# Tough insects precede fast ones, using the existing three variants.
+		var variant: int = 0 if index <= 1 else [0, 2, 1][ordinal % 3]
+		spawn_events.append({"time": times[i], "kind": kind, "variant": variant, "left": ordinal % 2 == 0, "done": false})
+	for actor in companions:
+		actor.chain_count = 0
+
+func _spawn_pest(event: Dictionary) -> void:
+	var kind: int = event.kind
+	var variant: int = event.variant
+	var root: Vector2 = branch_root.get_node("Base").root_position()
+	var target: Vector2 = Vector2(root.x, ground_y(root.x)) if kind == 0 else air_target()
+	var health: float = config.ground_pest_health[variant] if kind == 0 else config.air_pest_health[variant]
+	var speed_factor: float = config.pest_variant_speed[variant]
+	if kind == 0:
+		speed_factor *= rng.randf_range(config.ground_speed_variation.x, config.ground_speed_variation.y)
+	pests.append({"id": next_pest_id, "kind": kind, "variant": variant, "position": entry_position(kind, event.left, true), "target": target, "speed_factor": speed_factor, "hp": health, "hit_flash": 0.0, "locked_by": -1, "state": "MOVING"})
+	next_pest_id += 1
+
+func _tick_spawns() -> void:
+	for event in spawn_events:
+		if event.done or spawn_clock < event.time:
+			continue
+		var kind: int = event.kind
+		var root: Vector2 = branch_root.get_node("Base").root_position()
+		var target: Vector2 = Vector2(root.x, ground_y(root.x)) if kind == 0 else air_target()
+		var speed: float = (config.pest_speeds.x if kind == 0 else config.pest_speeds.y) * config.pest_variant_speed[event.variant]
+		if kind == 0:
+			speed *= minf(config.ground_speed_variation.x, config.ground_speed_variation.y)
+		var travel: float = maxf(0, entry_position(kind, event.left, true).distance_to(target) - config.hit_distance) / maxf(1, speed)
+		# Expire delayed entries instead of spawning enemies that dawn will erase.
+		if night_time + travel > config.night_duration - config.night_cleanup_seconds:
+			event.done = true
+			continue
+		if night_time - last_spawn_times[kind] < config.pest_min_spawn_gaps[kind]:
+			continue
+		var active: int = 0
+		for pest in pests:
+			if pest.kind == kind and pest.state == "MOVING":
+				active += 1
+		if active >= config.pest_active_limits[kind]:
+			continue
+		_spawn_pest(event)
+		event.done = true
+		last_spawn_times[kind] = night_time
+
+func _damage_pest(pest: Dictionary, damage: float) -> void:
+	pest.hp -= damage
+	pest.hit_flash = 0.2
+	if pest.hp <= 0:
+		pest.state = "REMOVED"
+		sound_requested.emit("death")
+
+func _incoming_damage(pest_id: int) -> float:
+	var damage: float = 0.0
+	for shot in projectiles:
+		if shot.target == pest_id:
+			damage += shot.damage
+	return damage
+
+func _bird_target(actor: Dictionary, chain: bool = false) -> Dictionary:
+	var air_pending: bool = pests.any(func(p): return p.kind == 1 and p.state == "MOVING")
+	for kind in [1, 0]:
+		if kind == 0 and air_pending:
+			break
+		var best: Dictionary = {}
+		var nearest_danger: float = INF
+		var nearest_flight: float = INF
+		for pest in pests:
+			if pest.kind != kind or pest.state != "MOVING" or (pest.locked_by != -1 and pest.locked_by != actor.id):
+				continue
+			if _incoming_damage(pest.id) >= pest.hp:
+				continue
+			if pest.position.distance_to(pest.target) > config.bird_guard_radius:
+				continue
+			var flight: float = actor.position.distance_to(pest.position)
+			if chain and flight > config.bird_chain_radius:
+				continue
+			var danger: float = _time_to_tree(pest)
+			# A reachable point near the tree is a conservative interception bound.
+			var intercept: float = maxf(0, actor.position.distance_to(pest.target) - config.hit_distance) / maxf(1, config.companion_speed)
+			if intercept + maxf(0, actor.cooldown) > danger:
+				continue
+			if danger < nearest_danger or (is_equal_approx(danger, nearest_danger) and flight < nearest_flight):
+				best = pest
+				nearest_danger = danger
+				nearest_flight = flight
+		if not best.is_empty():
+			return best
+	return {}
+
+func _tick_bird(actor: Dictionary, delta: float) -> void:
+	actor.cooldown = maxf(0, actor.cooldown - delta)
+	if actor.state == "IDLE" or (actor.state == "RETURNING" and actor.get("chain_count", 0) < config.bird_max_chain):
+		if actor.cooldown <= 0:
+			var best: Dictionary = _bird_target(actor, actor.state == "RETURNING")
+			if not best.is_empty():
+				best.locked_by = actor.id
+				actor.target = best.id
+				actor.state = "BUSY"
+	if actor.state == "BUSY":
+		var target: Dictionary = {}
+		for pest in pests:
+			if pest.id == actor.target and pest.state == "MOVING":
+				target = pest
+				break
+		var urgent: Dictionary = _bird_target(actor)
+		if not urgent.is_empty() and (target.is_empty() or (urgent.kind == 1 and target.kind == 0) or (urgent.kind == target.kind and _time_to_tree(urgent) + 0.8 < _time_to_tree(target))):
+			if not target.is_empty():
+				target.locked_by = -1
+			target = urgent
+			target.locked_by = actor.id
+			actor.target = target.id
+		if target.is_empty():
+			actor.state = "RETURNING"
+			actor.target = -1
+		else:
+			move_actor(actor, target.position, config.companion_speed, delta)
+			if actor.position.distance_to(target.position) <= config.hit_distance and actor.cooldown <= 0:
+				_damage_pest(target, target.hp if target.kind == 1 else config.bird_ground_damage)
+				target.locked_by = -1
+				actor.cooldown = maxf(0, config.bird_attack_interval)
+				actor.chain_count = actor.get("chain_count", 0) + 1
+				actor.target = -1
+				actor.state = "RETURNING"
+	elif actor.state == "RETURNING":
+		if move_actor(actor, actor.home, config.companion_speed, delta):
+			actor.state = "IDLE"
+			actor.target = -1
+			actor.chain_count = 0
+			actor.cooldown = maxf(actor.cooldown, config.bird_rest_seconds)
 
 func air_target() -> Vector2:
 	var target: Vector2 = anchors.get_node("PestAirAnchor").global_position
@@ -206,21 +417,15 @@ func air_target() -> Vector2:
 				found = true
 	return target
 
-func tick_night(delta: float) -> bool:
+func tick_night(delta: float) -> void:
+	var spawn_delta: float = minf(delta, maxf(0, config.night_duration - night_time))
 	night_time += delta
 	dusk_time += delta
 	animation_time += delta
 	tick_arrivals(delta)
-	spawn_elapsed += delta
-	var interval: float = maxf(0.3, config.pest_interval)
-	if not wave.is_empty() and (spawned == 0 or spawn_elapsed >= interval):
-		spawn_elapsed = 0
-		var kind: int = wave[spawned % wave.size()]
-		var root: Vector2 = branch_root.get_node("Base").root_position()
-		var target: Vector2 = Vector2(root.x, ground_y(root.x)) if kind == 0 else air_target()
-		pests.append({"id": next_pest_id, "kind": kind, "position": entry_position(kind, spawned % 2 == 0, true), "target": target, "speed_factor": rng.randf_range(config.ground_speed_variation.x, config.ground_speed_variation.y), "hp": 2 if kind == 0 else 1, "hit_flash": 0.0, "locked_by": -1, "state": "MOVING"})
-		next_pest_id += 1
-		spawned += 1
+	spawn_clock += spawn_delta * clampf(config.pest_spawn_multiplier, 0.5, 2.0)
+	if spawn_delta > 0:
+		_tick_spawns()
 	for actor in companions:
 		actor.throw_flash = maxf(0, actor.throw_flash - delta)
 		if actor.kind == 0:
@@ -229,57 +434,28 @@ func tick_night(delta: float) -> bool:
 				var closest: Dictionary = {}
 				var nearest_distance: float = INF
 				for pest in pests:
-					if pest.kind == 0 and pest.state == "MOVING":
-						var distance: float = actor.position.distance_squared_to(pest.position)
+					if pest.kind == 0 and pest.state == "MOVING" and _incoming_damage(pest.id) < pest.hp:
+						if not hamster_can_reach(actor.position, pest.position):
+							continue
+						var distance: float = _time_to_tree(pest)
 						if distance < nearest_distance:
 							nearest_distance = distance
 							closest = pest
 				if not closest.is_empty():
-					projectiles.append({"position": actor.position + Vector2(0, -25), "start": actor.position + Vector2(0, -25), "target": closest.id, "elapsed": 0.0})
+					projectiles.append({"position": actor.position + Vector2(0, -25), "start": actor.position + Vector2(0, -25), "target": closest.id, "elapsed": 0.0, "duration": clampf(actor.position.distance_to(closest.position) / maxf(1, config.pine_projectile_speed), 0.25, 1.2), "damage": config.hamster_damage})
 					sound_requested.emit("throw")
 					actor.facing = signf(closest.position.x - actor.position.x)
 					actor.cooldown = config.pine_throw_interval
 					actor.throw_flash = 0.3
 			continue
-		if actor.state == "IDLE":
-			var best: Dictionary = {}
-			var distance := INF
-			for pest in pests:
-				if pest.kind == actor.kind and pest.locked_by == -1 and pest.state == "MOVING":
-					var d: float = actor.position.distance_to(pest.position)
-					if d < distance:
-						best = pest
-						distance = d
-			if not best.is_empty():
-				best.locked_by = actor.id
-				actor.target = best.id
-				actor.state = "BUSY"
-		if actor.state == "BUSY":
-			var target: Dictionary = {}
-			for pest in pests:
-				if pest.id == actor.target and pest.state == "MOVING":
-					target = pest
-			if target.is_empty():
-				actor.state = "RETURNING"
-			else:
-				move_actor(actor, target.position, config.companion_speed, delta)
-				if actor.position.distance_to(target.position) <= config.hit_distance:
-					target.state = "REMOVED"
-					sound_requested.emit("death")
-					actor.state = "RETURNING"
-		elif actor.state == "RETURNING":
-			move_actor(actor, actor.home, config.companion_speed, delta)
-			if actor.position.distance_to(actor.home) < 1:
-				actor.state = "IDLE"
-				actor.target = -1
+		_tick_bird(actor, delta)
 	tick_projectiles(delta)
 	for pest in pests:
 		pest.hit_flash = maxf(0, pest.hit_flash - delta)
 		if pest.state != "MOVING":
 			continue
-		var speed: float = config.pest_speeds.x if pest.kind == 0 else config.pest_speeds.y
+		var speed: float = (config.pest_speeds.x if pest.kind == 0 else config.pest_speeds.y) * pest.speed_factor
 		if pest.kind == 0:
-			speed *= pest.get("speed_factor", 1.0)
 			var x: float = move_toward(pest.position.x, pest.target.x, speed * delta)
 			pest.position = Vector2(x, ground_y(x))
 			pest.target.y = ground_y(pest.target.x)
@@ -289,11 +465,6 @@ func tick_night(delta: float) -> bool:
 			pest.state = "HIT_TREE"
 			pest_hit.emit()
 	pests = pests.filter(func(p): return p.state == "MOVING")
-	return spawned == wave.size() and pests.is_empty()
-
-func finish_arrivals() -> void:
-	# Long hand-configured routes continue into night without teleporting or eating early.
-	pass
 
 func end_night() -> void:
 	pests.clear()
@@ -310,29 +481,25 @@ func tick_projectiles(delta: float) -> void:
 			if pest.id == shot.target and pest.state == "MOVING":
 				target = pest
 		if target.is_empty():
-			shot.elapsed = config.pine_flight_seconds
+			shot.elapsed = shot.duration
 			continue
 		shot.elapsed += delta
-		var t: float = clampf(shot.elapsed / config.pine_flight_seconds, 0, 1)
+		var t: float = clampf(shot.elapsed / shot.duration, 0, 1)
 		shot.position = shot.start.lerp(target.position, t) + Vector2(0, -sin(t * PI) * 75)
 		if t >= 1:
-			target.hp -= 1
-			target.hit_flash = 0.2
-			if target.hp <= 0:
-				target.state = "REMOVED"
-				sound_requested.emit("death")
-	projectiles = projectiles.filter(func(s): return s.elapsed < config.pine_flight_seconds)
+			_damage_pest(target, shot.damage)
+	projectiles = projectiles.filter(func(s): return s.elapsed < s.duration)
 
-func begin_day() -> void:
+func begin_day(day: int = 1) -> void:
 	visit_timer = rng.randf_range(config.visit_interval_min, config.visit_interval_max)
 	for actor in companions:
 		var route: Array = []
 		if actor.kind == 0:
 			route = actor.climb_route.duplicate()
+			if actor.state == "ARRIVING":
+				var reached: int = clampi(actor.climb_route.size() - actor.route.size(), 0, actor.climb_route.size())
+				route = route.slice(0, reached)
 			route.reverse()
-			# If an arrival was interrupted, do not jump upward to its uneaten acorn.
-			while not route.is_empty() and route[0].y < actor.position.y - 1:
-				route.pop_front()
 			route.append(Vector2(branch_root.get_node("Base").root_position().x, ground_y(branch_root.get_node("Base").root_position().x)))
 		var center_x: float = branch_root.get_node("Base").root_position().x if actor.kind == 0 else actor.home.x
 		var exit: Vector2 = actor.exit + Vector2(-160 if actor.exit.x < center_x else 160, 0)
@@ -342,6 +509,10 @@ func begin_day() -> void:
 		actor.route = route
 		actor.state = "LEAVING"
 	omens = omens.filter(func(o): return not o.assigned)
+	acorn_rolls.clear()
+	feather_rolls.clear()
+	_replenish_acorns(day)
+	_replenish_feathers(day)
 
 func tick_day(delta: float) -> void:
 	animation_time += delta

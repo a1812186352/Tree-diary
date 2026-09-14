@@ -1,24 +1,42 @@
 @tool
 extends Resource
-
-@export_group("临时关卡数值")
+@export_group("关卡数值")
 @export var day_duration: float = 40.0
 @export var max_hearts: int = 3
 @export var sunlight_per_day: int = 6
 @export var water_per_day: int = 6
 @export var resource_carry_over: bool = false
-@export var night_waves: Array[PackedInt32Array] = [PackedInt32Array(), PackedInt32Array([0, 0]), PackedInt32Array([0, 0]), PackedInt32Array([0, 0, 0]), PackedInt32Array([0, 1]), PackedInt32Array([0, 0, 1, 1])]
-@export var pest_interval: float = 1.5
-@export var pest_speeds: Vector2 = Vector2(60, 70)
+# Each list is a finite nightly roster: 0 ground, 1 air.
+@export var night_waves: Array[PackedInt32Array] = [PackedInt32Array(), PackedInt32Array([0, 0, 0, 0]), PackedInt32Array([0, 0, 0, 0, 0, 0]), PackedInt32Array([0, 0, 1, 0, 0, 0, 1, 0]), PackedInt32Array([0, 0, 1, 0, 0, 0, 1, 0, 0, 0]), PackedInt32Array([0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0])]
+@export var night_spawn_times: Array[PackedFloat32Array] = [PackedFloat32Array(), PackedFloat32Array([0, 4, 8, 12]), PackedFloat32Array([0, 2, 5, 7, 10, 12]), PackedFloat32Array([0, 1.8, 2.5, 5, 6.8, 9, 10, 12]), PackedFloat32Array([0, 1.6, 2.5, 4.5, 5.8, 7.2, 8.5, 10, 11.2, 12.5]), PackedFloat32Array([0, 1.4, 2, 4, 5.2, 6.4, 7, 9, 10.2, 11.4, 12, 13])]
+@export_group("夜晚防线与节奏")
+@export var hamster_attack_range: Vector2 = Vector2(390, 780)
+@export var pine_projectile_speed: float = 650.0
+@export var bird_guard_radius: float = 460.0
+@export var bird_chain_radius: float = 500.0
+@export var bird_max_chain: int = 2
+@export var bird_rest_seconds: float = 0.6
+@export var pest_active_limits: Vector2i = Vector2i(6, 2)
+@export var pest_min_spawn_gaps: Vector2 = Vector2(0.9, 3.5)
+@export var night_cleanup_seconds: float = 1.5
+@export var feather_replenish_targets: PackedInt32Array = PackedInt32Array([0, 0, 0, 1, 2, 2])
+@export_group("隐藏战斗数值（普通、快速、耐打）")
+@export var ground_pest_health: Vector3 = Vector3(4, 3, 7)
+@export var air_pest_health: Vector3 = Vector3(3, 2, 4)
+@export var pest_variant_speed: Vector3 = Vector3(1.0, 1.3, 0.85)
+@export var hamster_damage: float = 2.0
+@export var bird_ground_damage: float = 2.0
+@export var bird_attack_interval: float = 1.4
+@export_range(0.5, 2.0, 0.1) var pest_spawn_multiplier: float = 1.0
+@export var pest_speeds: Vector2 = Vector2(72, 80)
 @export var companion_speed: float = 180.0
 @export var companion_max_per_type: int = 3
 @export_group("伙伴动作与松子")
 @export var hamster_climb_speed: float = 230.0
 @export var hamster_walk_speed: float = 135.0
-@export var ground_speed_variation: Vector2 = Vector2(0.85, 1.15)
+@export var ground_speed_variation: Vector2 = Vector2(0.95, 1.05)
 @export var hamster_eat_seconds: float = 0.8
 @export var pine_throw_interval: float = 1.0
-@export_range(0.1, 3.0) var pine_flight_seconds: float = 0.65
 @export var pine_texture: Texture2D
 @export var visit_interval_min: float = 7.0
 @export var visit_interval_max: float = 13.0
@@ -26,23 +44,26 @@ extends Resource
 @export var companion_entry_distance: float = 890.0
 @export var pest_entry_distance: float = 1060.0
 @export var air_entry_height: float = 365.0
-@export_group("芽点生长 临时可调")
+@export_group("芽点生长")
 @export var costs: PackedInt32Array = PackedInt32Array([1, 2, 3])
 @export var snap_radius: float = 80.0
-@export var rotation_step_degrees: float = 15.0
-@export var rotation_limit_degrees: float = 30.0
-@export var allow_downward: bool = false
+@export var rotation_limit_degrees: float = 180.0
+@export var allow_downward: bool = true
 @export var max_branches: int = 30
 @export var max_depth: int = 8
-@export var collision_clearance: float = 16.0
 @export var growth_bounds: Rect2 = Rect2(-1440, -2400, 4800, 3155)
 @export var vertical_layer_height: float = 100.0
 @export var ground_omen_max_layer: int = 3
-@export_range(0, 1) var feather_probability: float = 1.0
+@export_range(0, 1) var feather_probability: float = 0.65
+@export_range(0, 30, 1) var feather_daily_min: int = 1
+@export_range(0, 30, 1) var feather_daily_max: int = 2
+@export_range(0, 30, 1) var feather_stock_max: int = 4
 @export_group("每日橡果（所有低层合计）")
 @export_range(0, 30, 1) var acorn_daily_min: int = 1
 @export_range(0, 30, 1) var acorn_daily_max: int = 3
 @export_range(0.0, 1.0, 0.01) var acorn_probability: float = 0.3
+@export_range(0, 30, 1) var acorn_stock_max: int = 6
+@export var acorn_replenish_targets: PackedInt32Array = PackedInt32Array([0, 1, 2, 2, 2, 2])
 @export_group("节奏与显示")
 @export var sky_duration: float = 1.2
 @export var page_duration: float = 1.55

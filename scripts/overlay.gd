@@ -83,9 +83,6 @@ func _draw() -> void:
 	var phase: String = game.phase.phase
 	if phase == "GAMEOVER":
 		return
-	_use_world_space()
-	for pickup in game.resources.pickups:
-		picture(sunlight_texture if pickup.kind == 0 else water_texture, pickup.position, 57)
 	_use_screen_space()
 	for flight in game.collection_flights:
 		var destination: Vector2 = game.get_node("UI/ResourcePocketAnchor").position + Vector2(84, 107 + flight.kind * 58)
@@ -110,6 +107,8 @@ func _draw() -> void:
 				_picture_transform(Vector2.ZERO)
 				draw_line(p + Vector2(4, -12), p + Vector2(-8, 20), Color("b2c3b4"), 2, true)
 	for actor in game.animals.companions + game.animals.visitors:
+		if not game.animal_drag.is_empty() and actor.id == game.animal_drag.id:
+			continue
 		_draw_actor(actor)
 	for shot in game.animals.projectiles:
 		if game.config.pine_texture != null:
@@ -129,7 +128,7 @@ func _draw() -> void:
 		if pest.get("hit_flash", 0.0) > 0:
 			draw_arc(p, pest_size * 0.5, 0, TAU, 24, Color("f4cf77"), 3, true)
 		if not pest_pool.is_empty():
-			var idx: int = pest.id % pest_pool.size()
+			var idx: int = int(pest.get("variant", 0)) % pest_pool.size()
 			picture(pest_pool[idx], p, pest_size)
 		else:
 			if pest.kind == 0:
@@ -153,6 +152,10 @@ func _draw() -> void:
 	_draw_pockets()
 	_draw_growth_tray()
 	_use_world_space()
+	for pickup in game.resources.pickups:
+		if pickup.get("backing", false):
+			draw_circle(pickup.position, 35, Color("f6f1e6"))
+		picture(sunlight_texture if pickup.kind == 0 else water_texture, pickup.position, 57)
 	if phase == "DAY" and game.candidate != null:
 		var cp: Vector2 = game.candidate.global_position
 		draw_circle(cp, 28, Color("f8c66a", 0.35))
@@ -165,6 +168,27 @@ func _draw() -> void:
 			var bp: Vector2 = bud.global_position
 			draw_circle(bp, 13, Color(0.96, 0.95, 0.78, 0.34))
 			draw_arc(bp, 12, 0, TAU, 28, Color("819a68"), 2.0, true)
+	if phase in ["DUSK", "NIGHT"]:
+		if not game.animal_drag.is_empty():
+			for bud in game.animals.relocation_nodes(game.animal_drag.id):
+				var bp: Vector2 = bud.global_position
+				var selected: bool = bud == game.animal_drop_node
+				var color: Color = Color("e4bd62") if selected else Color("819a68")
+				draw_circle(bp, 15 if selected else 10, Color(color, 0.28))
+				draw_arc(bp, 19 if selected else 12, 0, TAU, 28, color, 2.5, true)
+			if game.animal_drag.kind == 0:
+				var outline := PackedVector2Array()
+				for step in range(65):
+					var angle: float = TAU * step / 64.0
+					outline.append(game.animal_drag.position + Vector2(cos(angle), sin(angle)) * game.config.hamster_attack_range)
+				draw_polyline(outline, Color(0.51, 0.60, 0.41, 0.6), 2.0, true)
+			_draw_actor(game.animal_drag)
+			if not is_instance_valid(game.animal_drop_node):
+				draw_arc(game.animal_drag.position, 17, 0, TAU, 28, Color("c38c76"), 2.0, true)
+		else:
+			for actor in game.animals.companions:
+				if actor.state == "IDLE":
+					draw_arc(actor.position, 14, 0, TAU, 24, Color("e4bd62"), 2.0, true)
 	_use_screen_space()
 
 func _draw_actor(actor: Dictionary) -> void:
