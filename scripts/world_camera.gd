@@ -1,7 +1,7 @@
 extends Camera2D
 ## View-only transform: branch positions and gameplay distances stay in world units.
 signal view_changed
-@export var minimum_zoom: float = 0.45
+@export var minimum_zoom: float = 0.20
 @export var maximum_zoom: float = 1.5
 @export var zoom_step: float = 1.12
 var dragging: bool = false

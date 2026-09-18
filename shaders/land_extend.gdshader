@@ -3,6 +3,8 @@ render_mode unshaded;
 
 uniform vec2 top_fade = vec2(0.40, 0.54);
 varying vec4 vertex_tint;
+uniform vec4 season_color : source_color = vec4(1.0);
+uniform float season_blend = 0.0;
 
 float mirrored(float value) {
 	return 1.0 - abs(mod(value, 2.0) - 1.0);
@@ -22,5 +24,6 @@ void fragment() {
 	vec4 ink = texture(TEXTURE, vec2(mirrored(source_uv.x), sample_y));
 	ink.a *= smoothstep(top_fade.x, top_fade.y, source_uv.y);
 	// BookFrame owns the fixed page-edge mask.
+	ink.rgb = mix(ink.rgb, season_color.rgb * (0.85 + 0.15 * ink.r), season_blend);
 	COLOR = ink * vertex_tint;
 }

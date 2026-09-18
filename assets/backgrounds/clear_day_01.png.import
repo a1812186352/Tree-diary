@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dfxpmnhhhj0hk"
-path="res://.godot/imported/sky_night.png-5abb5fe39b0f3a774e2a31b6782ec07f.ctex"
+uid="uid://16ff0havy26c"
+path="res://.godot/imported/clear_day_01.png-946a5a0a53434c453013551593fa6fae.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://arsset/nature/sky_night.png"
-dest_files=["res://.godot/imported/sky_night.png-5abb5fe39b0f3a774e2a31b6782ec07f.ctex"]
+source_file="res://assets/backgrounds/clear_day_01.png"
+dest_files=["res://.godot/imported/clear_day_01.png-946a5a0a53434c453013551593fa6fae.ctex"]
 
 [params]
 

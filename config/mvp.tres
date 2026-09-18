@@ -4,11 +4,11 @@
 [ext_resource type="Texture2D" path="res://assets/endings/ending_survival.png" id="ending_survival"]
 [ext_resource type="Texture2D" path="res://assets/endings/ending_invasion.png" id="ending_invasion"]
 
-[ext_resource type="Texture2D" path="res://arsset/nature/sky_day.png" id="day"]
+[ext_resource type="Texture2D" path="res://assets/backgrounds/clear_day_01.png" id="day"]
 
-[ext_resource type="Texture2D" path="res://arsset/nature/sky_dusk.png" id="dusk"]
+[ext_resource type="Texture2D" path="res://assets/backgrounds/clear_dusk_01.png" id="dusk"]
 
-[ext_resource type="Texture2D" path="res://arsset/nature/sky_night.png" id="night"]
+[ext_resource type="Texture2D" path="res://assets/backgrounds/clear_night_01.png" id="night"]
 
 [ext_resource type="Texture2D" path="res://arsset/nature/pest_ground_1.png" id="pg1"]
 

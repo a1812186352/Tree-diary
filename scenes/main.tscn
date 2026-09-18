@@ -27,6 +27,7 @@ script = ExtResource("main")
 config = ExtResource("config")
 
 [node name="World" type="Node2D" parent="." unique_id=1820541588]
+z_index = 10
 
 [node name="Landscape" type="Node2D" parent="World"]
 script = ExtResource("landscape")

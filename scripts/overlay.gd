@@ -124,7 +124,7 @@ func _draw() -> void:
 		if pest.kind == 0:
 			p.y -= game.config.pest_display_size * 0.42
 		var pest_pool: Array[Texture2D] = game.config.pest_ground_textures if pest.kind == 0 else game.config.pest_air_textures
-		var pest_size: float = game.config.pest_display_size
+		var pest_size: float = maxf(game.config.pest_display_size, 24.0 / game.world_camera.zoom.x)
 		if pest.get("hit_flash", 0.0) > 0:
 			draw_arc(p, pest_size * 0.5, 0, TAU, 24, Color("f4cf77"), 3, true)
 		if not pest_pool.is_empty():
@@ -154,8 +154,8 @@ func _draw() -> void:
 	_use_world_space()
 	for pickup in game.resources.pickups:
 		if pickup.get("backing", false):
-			draw_circle(pickup.position, 35, Color("f6f1e6"))
-		picture(sunlight_texture if pickup.kind == 0 else water_texture, pickup.position, 57)
+			draw_circle(pickup.position, 32.0 / game.world_camera.zoom.x, Color(0.96, 0.94, 0.90, 0.75))
+		picture(sunlight_texture if pickup.kind == 0 else water_texture, pickup.position, 52.0 / game.world_camera.zoom.x)
 	if phase == "DAY" and game.candidate != null:
 		var cp: Vector2 = game.candidate.global_position
 		draw_circle(cp, 28, Color("f8c66a", 0.35))
@@ -195,6 +195,9 @@ func _draw_actor(actor: Dictionary) -> void:
 	var bird: bool = actor.kind == 1
 	var variant: int = actor.variant % bird_textures.size()
 	var texture: Texture2D = bird_textures[variant] if bird else ground_texture
+	var winter_costume: bool = game.config.current_season == 3 and actor.id % 2 == 0
+	if winter_costume:
+		texture = game.config.winter_bird if bird else game.config.winter_hamster
 	if texture == null:
 		return
 	var velocity: Vector2 = actor.get("velocity", Vector2.ZERO)
@@ -202,7 +205,7 @@ func _draw_actor(actor: Dictionary) -> void:
 	var t: float = game.animals.animation_time * (13.0 if bird else 10.0) + actor.id
 	var facing: float = actor.get("facing", 1.0)
 	# Blue bird faces left; yellow and peach birds face right in their source art.
-	var source_facing: float = -1.0 if bird and variant == 0 else 1.0
+	var source_facing: float = -1.0 if bird and (variant == 0 or winter_costume) else 1.0
 	var stretch := Vector2(facing * source_facing, 1)
 	var offset := Vector2(0, -25 if bird else -32)
 	var tilt: float = 0.0
@@ -216,7 +219,8 @@ func _draw_actor(actor: Dictionary) -> void:
 	if actor.get("throw_flash", 0.0) > 0:
 		tilt = -0.2 * facing * sin(actor.throw_flash / 0.3 * PI)
 	var dimensions: Vector2 = texture.get_size()
-	dimensions *= (80.0 if bird else 75.0) / maxf(dimensions.x, dimensions.y)
+	var actor_size: float = maxf(80.0 if bird else 75.0, 29.0 / game.world_camera.zoom.x)
+	dimensions *= actor_size / maxf(dimensions.x, dimensions.y)
 	_picture_transform(actor.position + offset, tilt, stretch)
 	draw_texture_rect(texture, Rect2(-dimensions * 0.5, dimensions), false)
 	_picture_transform(Vector2.ZERO)
@@ -231,7 +235,7 @@ func _draw_gameover_popup() -> void:
 		picture(illustration, Vector2(960, 486), 900)
 		draw_line(Vector2(80, 960), Vector2(1840, 960), Color("d6cbb4"), 1.5, true)
 		label_at(Vector2(80, 1006), "一棵树，一群朋友" if is_win else "这一页，被昆虫占据了", 30)
-		label_at(Vector2(80, 1044), "你守住了六个日夜，让这里成为了家。" if is_win else "再种一棵，让伙伴更早来到树的身边。", 22, Color("887960"))
+		label_at(Vector2(80, 1044), "你守过春夏秋冬，让这里成为了家。" if is_win else "再种一棵，让伙伴更早来到树的身边。", 22, Color("887960"))
 		return
 	var title: String = "一棵树，一群朋友" if is_win else "这一页，先休息一下"
 	var lines: Array[String] = []
@@ -289,10 +293,16 @@ func _draw_pockets() -> void:
 	for kind in range(2):
 		var texture: Texture2D = sunlight_texture if kind == 0 else water_texture
 		var count: int = 3 if Engine.is_editor_hint() else (game.resources.sunlight if kind == 0 else game.resources.water)
-		for i in range(count):
+		# Two permanent darker pockets indicate the overnight capacity.
+		for slot in range(2):
+			var center: Vector2 = p + Vector2(84 + slot * 49, 107 + kind * 58)
+			var pocket_color: Color = Color("b58d47") if kind == 0 else Color("769d9c")
+			draw_circle(center, 25.0, pocket_color)
+		for i in range(mini(count, 10)):
 			picture(texture, p + Vector2(84 + (i % 11) * 49, 107 + kind * 58 - floorf(float(i) / 11) * 8), 48)
 		if count == 0:
 			picture(texture, p + Vector2(84, 107 + kind * 58), 48, 0.25)
+		label_at(p + Vector2(610, 117 + kind * 58), "×%d" % count, 23)
 
 func tray_card_rect(index: int) -> Rect2:
 	var slot: Vector2 = game.get_node("UI/TraySlots").get_child(index).position

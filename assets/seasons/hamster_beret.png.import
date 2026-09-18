@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://0ts68xx7gx88"
-path="res://.godot/imported/sky_dusk.png-7b21bdd3554d48c575913eb9eb9c5ea1.ctex"
+uid="uid://8oxppygy5v24"
+path="res://.godot/imported/hamster_beret.png-fa126c1af26ce3bf0a156b3bd10c5638.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://arsset/nature/sky_dusk.png"
-dest_files=["res://.godot/imported/sky_dusk.png-7b21bdd3554d48c575913eb9eb9c5ea1.ctex"]
+source_file="res://assets/seasons/hamster_beret.png"
+dest_files=["res://.godot/imported/hamster_beret.png-fa126c1af26ce3bf0a156b3bd10c5638.ctex"]
 
 [params]
 

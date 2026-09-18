@@ -3,6 +3,8 @@
 .import/
 /android/
 export_credentials.cfg
+export_presets.cfg
+override.cfg
 
 # Exported builds and archives.
 /build/
@@ -26,7 +28,15 @@ export_credentials.cfg
 /.agents/
 /.vscode/
 /.idea/
-/addons/godot_ai/
+/addons/
+/.claude/
+/.cursor/
+/.mcp.json
+/mcp.json
+*.code-workspace
+AGENTS.md
+CLAUDE.md
+/四季版本修改说明.md
 /godot-ai-LICENSE.txt
 /work/
 *.lnk

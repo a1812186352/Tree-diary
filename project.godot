@@ -10,7 +10,7 @@ config_version=5
 
 [application]
 
-config/name="TREE v0.5"
+config/name="绘木小札"
 run/main_scene="res://scenes/opening/book_opening.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
 config/icon="res://icon.svg"

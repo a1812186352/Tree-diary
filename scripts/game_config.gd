@@ -5,7 +5,8 @@ extends Resource
 @export var max_hearts: int = 3
 @export var sunlight_per_day: int = 6
 @export var water_per_day: int = 6
-@export var resource_carry_over: bool = false
+@export var resource_carry_over: bool = true
+@export var resource_carry_limit: int = 2
 # Each list is a finite nightly roster: 0 ground, 1 air.
 @export var night_waves: Array[PackedInt32Array] = [PackedInt32Array(), PackedInt32Array([0, 0, 0, 0]), PackedInt32Array([0, 0, 0, 0, 0, 0]), PackedInt32Array([0, 0, 1, 0, 0, 0, 1, 0]), PackedInt32Array([0, 0, 1, 0, 0, 0, 1, 0, 0, 0]), PackedInt32Array([0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0])]
 @export var night_spawn_times: Array[PackedFloat32Array] = [PackedFloat32Array(), PackedFloat32Array([0, 4, 8, 12]), PackedFloat32Array([0, 2, 5, 7, 10, 12]), PackedFloat32Array([0, 1.8, 2.5, 5, 6.8, 9, 10, 12]), PackedFloat32Array([0, 1.6, 2.5, 4.5, 5.8, 7.2, 8.5, 10, 11.2, 12.5]), PackedFloat32Array([0, 1.4, 2, 4, 5.2, 6.4, 7, 9, 10.2, 11.4, 12, 13])]
@@ -49,8 +50,8 @@ extends Resource
 @export var snap_radius: float = 80.0
 @export var rotation_limit_degrees: float = 180.0
 @export var allow_downward: bool = true
-@export var max_branches: int = 30
-@export var max_depth: int = 8
+@export var max_branches: int = 96
+@export var max_depth: int = 18
 @export var growth_bounds: Rect2 = Rect2(-1440, -2400, 4800, 3155)
 @export var vertical_layer_height: float = 100.0
 @export var ground_omen_max_layer: int = 3
@@ -129,3 +130,22 @@ extends Resource
 @export_multiline var ending_survival_text: String = "小树长成了大树，\n这颗树真的长出了能容纳生命的地方...."
 @export var ending_invasion_title: String = ""
 @export_multiline var ending_invasion_text: String = "树木被昆虫们占领了，\n下一次，考虑一下和小动物们合作吧"
+
+@export_group("四季日程")
+@export var total_days: int = 12
+var current_season: int = -1
+var season_name: String = "春"
+var difficulty_name: String = "低"
+var season_tip: String = ""
+var sunlight_range: Vector2i = Vector2i(6, 8)
+var water_range: Vector2i = Vector2i(6, 8)
+var season_population: Vector2i = Vector2i(3, 1)
+var recruit_targets: Vector2i = Vector2i.ZERO
+var season_icon: Texture2D
+var season_pouch: Texture2D
+var seasonal_snow: Array[Texture2D] = []
+var winter_hamster: Texture2D
+var winter_bird: Texture2D
+var ground_season_color: Color = Color.WHITE
+var ground_season_blend: float = 0.0
+var night_health_factor: float = 1.0

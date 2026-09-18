@@ -1,6 +1,7 @@
 @tool
 extends Node2D
 const Layout = preload("res://scripts/book_layout.gd")
+const Seasons = preload("res://scripts/seasons.gd")
 const ReadingSpread = preload("res://scripts/reading_spread.gd")
 
 @export var config: Resource
@@ -49,6 +50,12 @@ var menu_mode: int = MenuMode.NONE
 var menu_buttons: Array[Button] = []
 var settings_controls: Array[Control] = []
 var settings_panel: Control
+var tutorial: Control
+var season_notice_seconds: float = 10.0
+var clock_dragging: bool = false
+var clock_drag_angle: float = 0.0
+var clock_forward_seconds: float = 0.0
+var night_fast_forward: bool = false
 
 func _ready() -> void:
 	if config == null:
@@ -57,6 +64,8 @@ func _ready() -> void:
 	title_font.font_names = PackedStringArray(["Microsoft YaHei", "Noto Sans CJK SC"])
 	if Engine.is_editor_hint():
 		return
+	config = config.duplicate(true)
+	Seasons.configure(config)
 	get_node("/root/BookFrame").set_mode("game")
 	page_turn = preload("res://scripts/page_turn.gd").new()
 	page_turn.name = "PageTurn"
@@ -78,6 +87,9 @@ func _ready() -> void:
 	_build_ui()
 	world_camera.view_changed.connect(_on_view_changed)
 	_on_phase_changed("DAY")
+	tutorial = preload("res://scripts/tutorial.gd").new()
+	tutorial.game = self
+	$UI.add_child(tutorial)
 	_draw_land()
 
 func _on_view_changed() -> void:
@@ -431,7 +443,8 @@ func _handle_animal_input(event: InputEvent) -> bool:
 		if event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
 			_update_animal_drag(event.position)
 			if is_instance_valid(animal_drop_node):
-				animals.relocate_companion(animal_drag.id, animal_drop_node)
+				if animals.relocate_companion(animal_drag.id, animal_drop_node) and is_instance_valid(tutorial):
+					tutorial.record("relocate")
 			_cancel_animal_drag()
 			return true
 		return event.button_index == MOUSE_BUTTON_LEFT
@@ -463,9 +476,14 @@ func _handle_animal_input(event: InputEvent) -> bool:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_FOCUS_OUT and is_node_ready() and not Engine.is_editor_hint():
 		_cancel_animal_drag()
+		clock_dragging = false
+		clock_forward_seconds = 0
 
 func _input(event: InputEvent) -> void:
 	if Engine.is_editor_hint():
+		return
+	if _handle_clock_input(event):
+		get_viewport().set_input_as_handled()
 		return
 	if phase.phase in ["PAGE_TURN", "GAMEOVER"]:
 		world_camera.dragging = false
@@ -529,6 +547,8 @@ func _input(event: InputEvent) -> void:
 			if is_instance_valid(preview):
 				cancel_preview()
 			elif growth.remove_nearest(pointer, 90.0):
+				if is_instance_valid(tutorial):
+					tutorial.record("undo")
 				status = "贴纸已取回，资源返还"
 				pocket_shake = 0.4
 				hint_time = 2
@@ -538,8 +558,10 @@ func _input(event: InputEvent) -> void:
 		elif event.button_index == MOUSE_BUTTON_LEFT:
 			if event.pressed and selected_kind < 0:
 				var old_sun: int = resources.sunlight
-				if resources.collect_at(pointer):
+				if resources.collect_at(pointer, 38.0 / world_camera.zoom.x):
 					var kind: int = 0 if resources.sunlight > old_sun else 1
+					if is_instance_valid(tutorial):
+						tutorial.record("sun" if kind == 0 else "water")
 					collection_flights.append({"kind": kind, "start": pointer, "progress": 0.0})
 					$Systems/MusicManager.play_effect("sun" if kind == 0 else "water")
 			elif not event.pressed and dragging:
@@ -606,6 +628,10 @@ func _on_pest_hit() -> void:
 		phase.finish("LOSE")
 
 func _on_phase_changed(next: String) -> void:
+	clock_dragging = false
+	clock_forward_seconds = 0.0
+	if next != "NIGHT":
+		night_fast_forward = false
 	_cancel_animal_drag()
 	cancel_preview()
 	for button in buttons:
@@ -623,7 +649,7 @@ func _on_phase_changed(next: String) -> void:
 			page_swapped = false
 			status = "点击收集阳光与水滴，再把枝条拖到芽点"
 		"DUSK":
-			resources.pickups.clear()
+			resources.end_day()
 			animals.begin_dusk(phase.day)
 			status = ""
 		"NIGHT":
@@ -645,7 +671,7 @@ func _on_phase_changed(next: String) -> void:
 			$UI.add_child(ending)
 			$UI.move_child(ending, 0)
 			var won: bool = phase.result == "WIN"
-			var ending_texture: Texture2D = _create_tree_portrait(ending) if won else config.ending_invasion_texture
+			var ending_texture: Texture2D = config.ending_survival_texture if won else config.ending_invasion_texture
 			ending.show_page(ending_texture,
 				config.ending_survival_title if won else config.ending_invasion_title,
 				config.ending_survival_text if won else config.ending_invasion_text)
@@ -714,8 +740,13 @@ func _prepare_next_page() -> void:
 		return
 	page_swapped = true
 	phase.day += 1
+	var previous_season: int = config.current_season
+	Seasons.apply(config, phase.day)
+	season_notice_seconds = 10.0 if previous_season != config.current_season else 4.0
 	growth.mature(phase.day)
 	foliage.refresh()
+	if phase.day >= 3:
+		_fit_tree_view()
 	animals.pests.clear()
 	_begin_resources_day()
 	animals.begin_day(phase.day)
@@ -772,19 +803,46 @@ func _process(delta: float) -> void:
 		queue_redraw()
 		overlay.queue_redraw()
 		return
-	var dt := delta * time_scale
+	var force_clock: bool = clock_forward_seconds > 0 or night_fast_forward
+	var rate: float = 16.0 if night_fast_forward else time_scale
+	var budget: float = minf(delta, 0.1) * rate
+	var extra: float = minf(clock_forward_seconds, 0.5)
+	clock_forward_seconds -= extra
+	budget = minf(budget + extra, 2.0)
+	# Advance combat in small steps, so dragging the clock cannot skip enemy hits.
+	for iteration in range(120):
+		if budget <= 0 or phase.phase in ["PAGE_TURN", "GAMEOVER"]:
+			break
+		if is_instance_valid(tutorial) and tutorial.freezes_actors():
+			break
+		var before: String = phase.phase
+		var dt: float = minf(budget, 1.0 / 60.0)
+		_tick_simulation(dt, force_clock)
+		budget -= dt
+		if phase.phase != before:
+			break
+
+func _tick_simulation(dt: float, force_clock: bool = false) -> void:
 	placement_lock = maxf(0, placement_lock - dt)
 	for flight in collection_flights:
 		flight.progress += dt / 0.35
 	collection_flights = collection_flights.filter(func(f): return f.progress < 1)
-	phase.elapsed += dt
+	if force_clock or not is_instance_valid(tutorial) or not tutorial.freezes_clock():
+		phase.elapsed += dt
 	_update_clock_time()
 	sky_progress = minf(1.0, sky_progress + dt / maxf(config.sky_duration, 0.01))
 	pocket_shake = maxf(0, pocket_shake - dt)
 	hint_time = maxf(0, hint_time - dt)
+	season_notice_seconds = maxf(0, season_notice_seconds - dt)
+	if is_instance_valid(tutorial) and tutorial.freezes_actors():
+		queue_redraw()
+		overlay.queue_redraw()
+		return
 	match phase.phase:
 		"DAY":
 			animals.tick_day(dt)
+			if force_clock or not is_instance_valid(tutorial) or not tutorial.freezes_clock():
+				resources.tick_day(dt, world_camera)
 			if phase.elapsed >= config.day_duration:
 				phase.enter("DUSK")
 		"DUSK":
@@ -795,7 +853,7 @@ func _process(delta: float) -> void:
 			animals.tick_night(dt)
 			if phase.phase == "NIGHT" and phase.elapsed >= config.night_duration:
 				animals.end_night()
-				if phase.day >= config.night_waves.size():
+				if phase.day >= config.total_days:
 					phase.finish("WIN")
 				else:
 					phase.enter("PAGE_TURN")
@@ -851,11 +909,20 @@ func _draw_sky(theme: String, angle: float) -> void:
 	draw_set_transform_matrix(_screen_drawing_transform() * Transform2D(angle, pivot))
 	if texture != null:
 		var texture_size: Vector2 = texture.get_size()
-		var fit: float = maxf(config.sky_size.x / texture_size.x, config.sky_size.y / texture_size.y)
-		var size: Vector2 = texture_size * fit
-		var top_left: Vector2 = config.sky_center - pivot - size * 0.5
-		if theme == "DUSK":
-			top_left += config.sky_dusk_offset
+		# Cover the visible page instead of magnifying into the old oversized canvas.
+		var page_size := Vector2(1920, 1080)
+		var fit: float = maxf(page_size.x / texture_size.x, page_size.y / texture_size.y)
+		var distant_zoom: float = 1.0
+		var camera_offset := Vector2.ZERO
+		if not Engine.is_editor_hint() and is_instance_valid(world_camera):
+			# A distant sky follows the same direction as the landscape, more gently.
+			distant_zoom += 0.08 * log(maxf(world_camera.zoom.x, world_camera.minimum_zoom) / world_camera.minimum_zoom)
+			camera_offset = -(world_camera.position - world_camera.home) * world_camera.zoom.x * 0.08
+		var size: Vector2 = texture_size * fit * distant_zoom
+		var margin: Vector2 = (size - page_size) * 0.5
+		# Bound the parallax by actual spare artwork, never exposing empty edges.
+		camera_offset = camera_offset.clamp(-margin, margin)
+		var top_left: Vector2 = page_size * 0.5 + camera_offset - pivot - size * 0.5
 		# Clamped UVs retain the existing composition and extend the edge color
 		# to the shared seam, without wrapping or exposing empty corners.
 		var points := PackedVector2Array([panel.position, Vector2(panel.end.x, panel.position.y), panel.end, Vector2(panel.position.x, panel.end.y)])
@@ -892,5 +959,70 @@ func _update_clock_time() -> void:
 			clock_time = config.day_duration + config.dusk_duration + minf(phase.elapsed, config.night_duration)
 
 func clock_angle() -> float:
-	var duration: float = config.day_duration + config.dusk_duration + config.night_duration
-	return PI + TAU * clampf(clock_time / duration, 0, 1)
+	# Face boundaries: left -> right (day), right -> lower-right (dusk).
+	var dusk_arc: float = atan2(127.0, 110.0)
+	if clock_time <= config.day_duration:
+		return PI + PI * clampf(clock_time / config.day_duration, 0, 1)
+	if clock_time <= config.day_duration + config.dusk_duration:
+		return TAU + dusk_arc * clampf((clock_time - config.day_duration) / config.dusk_duration, 0, 1)
+	return TAU + dusk_arc + (PI - dusk_arc) * clampf((clock_time - config.day_duration - config.dusk_duration) / config.night_duration, 0, 1)
+
+func _clock_seconds_per_radian() -> float:
+	var dusk_arc: float = atan2(127.0, 110.0)
+	match phase.phase:
+		"DAY": return config.day_duration / PI
+		"DUSK": return config.dusk_duration / dusk_arc
+		_: return config.night_duration / (PI - dusk_arc)
+
+func _fit_tree_view() -> void:
+	var bounds := Rect2(branches.get_node("Base").root_position(), Vector2.ONE)
+	for branch in branches.get_children():
+		if not branch.preview:
+			bounds = bounds.expand(branch.root_position()).expand(branch.tip_position())
+	bounds = bounds.grow(120)
+	var fit: float = clampf(minf(1400.0 / maxf(1, bounds.size.x), 570.0 / maxf(1, bounds.size.y)), world_camera.minimum_zoom, 1.0)
+	world_camera.zoom = Vector2.ONE * fit
+	world_camera.position = bounds.get_center() + Vector2(0, 70.0 / fit)
+	world_camera.force_update_scroll()
+	world_camera.view_changed.emit()
+
+func start_night_fast_forward() -> void:
+	if phase.phase == "NIGHT":
+		night_fast_forward = true
+		clock_forward_seconds = 0.0
+
+func _handle_clock_input(event: InputEvent) -> bool:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed and clock_dragging:
+		clock_dragging = false
+		return true
+	if menu_mode != MenuMode.NONE or phase.phase not in ["DAY", "DUSK", "NIGHT"]:
+		clock_dragging = false
+		clock_forward_seconds = 0.0
+		return false
+	if is_instance_valid(tutorial) and not tutorial.clock_input_allowed():
+		clock_dragging = false
+		return false
+	var center: Vector2 = $UI/ClockAnchor.position
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		if dragging or not animal_drag.is_empty() or get_viewport().gui_get_hovered_control() != null:
+			return false
+		var tip: Vector2 = center + Vector2.from_angle(clock_angle()) * overlay.clock_size * 0.29
+		var nearest: Vector2 = Geometry2D.get_closest_point_to_segment(event.position, center, tip)
+		if event.position.distance_to(nearest) <= 18 and event.position.distance_to(center) > 10:
+			clock_dragging = true
+			clock_drag_angle = (event.position - center).angle()
+			world_camera.dragging = false
+			return true
+	if event is InputEventMouseMotion and clock_dragging:
+		var offset: Vector2 = event.position - center
+		if offset.length() < 15:
+			return true
+		var angle: float = offset.angle()
+		var forward: float = wrapf(angle - clock_drag_angle, -PI, PI)
+		# Keep the furthest clockwise angle; reversing cannot repeatedly earn time.
+		if forward > 0 and forward < PI * 0.5:
+			clock_drag_angle = angle
+			var duration: float = config.day_duration + config.dusk_duration + config.night_duration
+			clock_forward_seconds = minf(duration, clock_forward_seconds + forward * _clock_seconds_per_radian())
+		return true
+	return false
